@@ -8,6 +8,8 @@ var articles_1 = require("./articles");
 var app = express_1.default();
 var port = 3000;
 app.get('/', function (req, res) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     res.send(JSON.stringify(articles_1.articles));
 });
 app.listen(port, function () {
