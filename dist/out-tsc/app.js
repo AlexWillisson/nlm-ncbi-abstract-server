@@ -6,7 +6,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const node_fetch_1 = __importDefault(require("node-fetch"));
 const xml2js_1 = require("xml2js");
+const pg_1 = require("pg");
 const articles_1 = require("./articles");
+const pool = new pg_1.Pool({
+    user: 'node',
+    host: 'localhost',
+    database: 'abstract_viewer',
+    password: 'tt#rXJn8&K#Q',
+    port: 5432,
+});
 function fetchArticles(ids) {
     let splitByType = {};
     let types = [];
@@ -95,6 +103,13 @@ function abstractsFromPubmedArticles(response) {
     });
     return articles;
 }
+pool.query('select external_articles.article_id, types.name from external_articles join types on external_articles.type = types.id', (error, results) => {
+    // pool.query('select 1', (error, results) => {
+    if (error) {
+        throw error;
+    }
+    console.log(results.rows);
+});
 const app = express_1.default();
 const port = 3000;
 app.get('/', (req, res) => {

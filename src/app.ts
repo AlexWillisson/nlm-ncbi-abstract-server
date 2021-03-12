@@ -1,9 +1,17 @@
 import express from 'express';
 import fetch from 'node-fetch';
-
 import { Parser as xmlParser } from 'xml2js';
+import { Pool } from 'pg';
 
 import { ExternalArticle, ArticleData, AbstractSection, externalArticles } from './articles';
+
+const pool = new Pool({
+    user: 'node',
+    host: 'localhost',
+    database: 'abstract_viewer',
+    password: 'tt#rXJn8&K#Q',
+    port: 5432,
+})
 
 function fetchArticles(ids: ExternalArticle[]): Promise<any> {
     let splitByType: { [type: string]: string[] } = {};
@@ -111,6 +119,14 @@ function abstractsFromPubmedArticles(response: any): ArticleData[] {
 
     return articles;
 }
+
+pool.query('select external_articles.article_id, types.name from external_articles join types on external_articles.type = types.id', (error, results) => {
+    if (error) {
+        throw error
+    }
+
+    console.log(results.rows);
+});
 
 const app = express();
 const port = 3000;
