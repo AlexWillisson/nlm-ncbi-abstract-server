@@ -4,7 +4,7 @@ import { Parser as xmlParser } from 'xml2js';
 import { Pool } from 'pg';
 import { Observable } from 'rxjs';
 
-import { ExternalArticle, ArticleData, AbstractSection, externalArticles } from './articles';
+import { ExternalArticle, ArticleData, AbstractSection } from './articles';
 
 const pool = new Pool({
     user: 'node',
@@ -121,16 +121,23 @@ function abstractsFromPubmedArticles(response: any): ArticleData[] {
     return articles;
 }
 
-let columns = ['external_articles.article_id', 'types.name', 'external_articles.cached_id'];
-let join = 'join types on external_articles.type = types.id';
-let queryStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
-pool.query(queryStr, (error, results) => {
-    if (error) {
-        throw error
-    }
+var externalArticles: ExternalArticle[] = [];
 
-    console.log(results.rows);
-});
+const articleIdFetchQueue = new Promise((resolve: any) => {
+    let columns = ['external_articles.article_id as id', 'types.name as type', 'external_articles.cached_id'];
+    let join = 'join types on external_articles.type = types.id';
+    let queryStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
+
+    pool.query(queryStr, (error, results) => {
+        if (error) {
+            throw error
+        }
+
+        results.rows.forEach((row: ExternalArticle) => {
+            externalArticles.push(row);
+        });
+    });
+})
 
 const app = express();
 const port = 3000;

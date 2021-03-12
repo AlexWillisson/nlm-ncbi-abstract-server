@@ -7,7 +7,6 @@ const express_1 = __importDefault(require("express"));
 const node_fetch_1 = __importDefault(require("node-fetch"));
 const xml2js_1 = require("xml2js");
 const pg_1 = require("pg");
-const articles_1 = require("./articles");
 const pool = new pg_1.Pool({
     user: 'node',
     host: 'localhost',
@@ -103,21 +102,26 @@ function abstractsFromPubmedArticles(response) {
     });
     return articles;
 }
-let columns = ['external_articles.article_id', 'types.name', 'external_articles.cached_id'];
-let join = 'join types on external_articles.type = types.id';
-let queryStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
-pool.query(queryStr, (error, results) => {
-    if (error) {
-        throw error;
-    }
-    console.log(results.rows);
+var externalArticles = [];
+const articleIdFetchQueue = new Promise((resolve) => {
+    let columns = ['external_articles.article_id as id', 'types.name as type', 'external_articles.cached_id'];
+    let join = 'join types on external_articles.type = types.id';
+    let queryStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
+    pool.query(queryStr, (error, results) => {
+        if (error) {
+            throw error;
+        }
+        results.rows.forEach((row) => {
+            externalArticles.push(row);
+        });
+    });
 });
 const app = express_1.default();
 const port = 3000;
 app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    fetchArticles(articles_1.externalArticles)
+    fetchArticles(externalArticles)
         .then((values) => {
         res.send(JSON.stringify(values[0].value));
     });
