@@ -2,24 +2,29 @@ import express from 'express';
 import https from 'https';
 import http from 'http';
 
+import { parseString } from 'xml2js';
+
 import { testArticles } from './testArticles';
 import { ExternalArticle, ArticleData, externalArticles } from './articles';
 
-function fetchArticle(id: number): ArticleData[] {
-    var options = {
+function fetchArticles(ids: number[]): ArticleData[] {
+    let options = {
         host: 'eutils.ncbi.nlm.nih.gov',
         path: '/entrez/eutils/efetch.fcgi?db=pubmed&id=20021716&format=xml'
     };
 
     let callback = function (response: http.IncomingMessage) {
-        var str = '';
+        var xml = '';
+        var fetchResults = '';
 
         response.on('data', function (chunk) {
-            str += chunk;
+            xml += chunk;
         });
 
         response.on('end', function () {
-            console.log(str);
+            parseString(xml, function (err, result) {
+                console.log(JSON.stringify(result));
+            });
         });
     }
 
@@ -27,7 +32,7 @@ function fetchArticle(id: number): ArticleData[] {
 
     return [];
 }
-fetchArticle(20021716);
+fetchArticles([20021716]);
 
 const app = express();
 const port = 3000;

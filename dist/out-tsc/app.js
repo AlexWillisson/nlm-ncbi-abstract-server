@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 var express_1 = __importDefault(require("express"));
 var https_1 = __importDefault(require("https"));
+var xml2js_1 = require("xml2js");
 var testArticles_1 = require("./testArticles");
 function fetchArticle(id) {
     var options = {
@@ -12,14 +13,15 @@ function fetchArticle(id) {
         path: '/entrez/eutils/efetch.fcgi?db=pubmed&id=20021716&format=xml'
     };
     var callback = function (response) {
-        var str = '';
-        //another chunk of data has been received, so append it to `str`
+        var xml = '';
+        var fetchResults = '';
         response.on('data', function (chunk) {
-            str += chunk;
+            xml += chunk;
         });
-        //the whole response has been received, so we just print it out here
         response.on('end', function () {
-            console.log(str);
+            xml2js_1.parseString(xml, function (err, result) {
+                console.log(JSON.stringify(result));
+            });
         });
     };
     https_1.default.request(options, callback).end();
