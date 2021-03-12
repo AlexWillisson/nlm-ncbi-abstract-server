@@ -52,8 +52,7 @@ function abstractsFromArticles(db, rawArticle) {
     else {
         let article = {
             id: "UnsupportedArticleDatabase",
-            title: '',
-            abstract: ''
+            title: ''
         };
         return [article];
     }
@@ -62,23 +61,30 @@ function abstractsFromPubmedArticles(response) {
     let rawArticles = response.PubmedArticleSet.PubmedArticle;
     let articles = [];
     rawArticles.forEach((rawArticle) => {
-        let id, title, abstract;
+        let id, title, abstractSections;
+        let rawAbstractSections;
         id = rawArticle.MedlineCitation[0].PMID[0]['_'];
         title = rawArticle.MedlineCitation[0].Article[0].ArticleTitle;
-        try {
-            abstract = rawArticle.MedlineCitation[0].Article[0].Abstract[0].AbstractText;
-        }
-        catch (error) {
-            abstract = 'No abstract available';
-        }
         let article = {
             id: id,
-            title: title,
-            abstract: abstract
+            title: title
         };
+        if (typeof rawArticle.MedlineCitation[0].Article[0].Abstract !== "undefined") {
+            rawAbstractSections = rawArticle.MedlineCitation[0].Article[0].Abstract[0].AbstractText;
+            abstractSections = [];
+            rawAbstractSections.forEach((rawSection) => {
+                let section = {
+                    body: rawSection['_']
+                };
+                if (rawSection['$'] && rawSection['$'].Label) {
+                    section.label = rawSection['$'].Label;
+                }
+                abstractSections.push(section);
+            });
+            article.abstract = abstractSections;
+        }
         articles.push(article);
     });
-    console.log(articles);
     return articles;
 }
 const app = express_1.default();
@@ -88,7 +94,7 @@ app.get('/', (req, res) => {
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     fetchArticles(articles_1.externalArticles)
         .then((values) => {
-        res.send(JSON.stringify(values));
+        res.send(JSON.stringify(values[0].value));
     });
 });
 app.listen(port, () => {

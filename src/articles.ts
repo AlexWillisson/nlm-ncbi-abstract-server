@@ -6,7 +6,12 @@ export interface ExternalArticle {
 export interface ArticleData {
     id: string;
     title: string;
-    abstract: string;
+    abstract?: AbstractSection[];
+}
+
+export interface AbstractSection {
+    label?: string,
+    body: string
 }
 
 export const externalArticles: ExternalArticle[] = [

@@ -5,7 +5,7 @@ import { ExceptionHandler } from 'winston';
 
 import { Parser as xmlParser } from 'xml2js';
 
-import { ExternalArticle, ArticleData, externalArticles } from './articles';
+import { ExternalArticle, ArticleData, AbstractSection, externalArticles } from './articles';
 
 function fetchArticles(ids: ExternalArticle[]): Promise<any> {
     let splitByType: { [type: string]: string[] } = {};
@@ -59,8 +59,7 @@ function abstractsFromArticles(db: string, rawArticle: any): ArticleData[] {
     } else {
         let article: ArticleData = {
             id: "UnsupportedArticleDatabase",
-            title: '',
-            abstract: ''
+            title: ''
         }
 
         return [article];
@@ -72,26 +71,37 @@ function abstractsFromPubmedArticles(response: any): ArticleData[] {
     let articles: ArticleData[] = [];
 
     rawArticles.forEach((rawArticle: any) => {
-        let id: string, title: string, abstract: string;
+        let id: string, title: string, abstractSections: AbstractSection[];
+        let rawAbstractSections: any[];
         id = rawArticle.MedlineCitation[0].PMID[0]['_'];
         title = rawArticle.MedlineCitation[0].Article[0].ArticleTitle;
     
-        try {
-            abstract = rawArticle.MedlineCitation[0].Article[0].Abstract[0].AbstractText;
-        } catch (error) {
-            abstract = 'No abstract available';
-        }
-
         let article: ArticleData = {
             id: id,
-            title: title,
-            abstract: abstract
+            title: title
+        };
+
+        if (typeof rawArticle.MedlineCitation[0].Article[0].Abstract !== "undefined") {
+            rawAbstractSections = rawArticle.MedlineCitation[0].Article[0].Abstract[0].AbstractText;
+            abstractSections = [];
+
+            rawAbstractSections.forEach((rawSection: any) => {
+                let section: AbstractSection = {
+                    body: rawSection['_']
+                }
+
+                if (rawSection['$'] && rawSection['$'].Label) {
+                    section.label = rawSection['$'].Label;
+                }
+
+                abstractSections.push(section);
+            });
+
+            article.abstract = abstractSections;
         }
 
         articles.push(article);
     });
-
-    console.log(articles);
 
     return articles;
 }
@@ -104,7 +114,7 @@ app.get('/', (req, res) => {
 
     fetchArticles(externalArticles)
         .then((values: any) => {
-            res.send(JSON.stringify(values));
+            res.send(JSON.stringify(values[0].value));
         });
 });
 app.listen(port, () => {
