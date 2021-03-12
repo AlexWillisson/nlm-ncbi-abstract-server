@@ -4,7 +4,7 @@ export interface ExternalArticle {
 }
 
 export interface ArticleData {
-    id: number;
+    id: string;
     title: string;
     abstract: string;
 }
@@ -20,5 +20,4 @@ export const externalArticles: ExternalArticle[] = [
     { type: 'pubmed', id: '25087612' },
     { type: 'pubmed', id: '27171515' },
     { type: 'pubmed', id: '28546993' },
-    { type: 'omim', id: '42' },
 ];

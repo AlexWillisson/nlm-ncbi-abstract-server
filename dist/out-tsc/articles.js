@@ -12,5 +12,4 @@ exports.externalArticles = [
     { type: 'pubmed', id: '25087612' },
     { type: 'pubmed', id: '27171515' },
     { type: 'pubmed', id: '28546993' },
-    { type: 'omim', id: '42' },
 ];
