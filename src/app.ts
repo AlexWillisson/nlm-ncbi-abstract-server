@@ -1,5 +1,4 @@
 import express from 'express';
-// import https from 'https';
 import http from 'http';
 import fetch from 'node-fetch';
 
@@ -21,15 +20,10 @@ function fetchArticles(ids: ExternalArticle[]): Promise<any> {
         splitByType[article.type].push(article.id);
     });
 
-    // let collectedArticles: ArticleData[] = [];
     let articlePromiseList: Promise<any>[] = [];
     types.forEach((type: string) => {
         let articles = fetchArticlesPerDb(type, splitByType[type]);
         articlePromiseList.push(articles);
-        // articles.then((res: any) => {
-        //     console.log(JSON.stringify(res));
-        // });
-        // collectedArticles = collectedArticles.concat(articles);
     });
 
     let articlePromises = Promise.allSettled(articlePromiseList);
@@ -58,20 +52,6 @@ function fetchArticlesPerDb(db: string, ids: string[]): Promise<any> {
                     });
             });
     });
-    // fetch("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + query.toString())
-    //     .then((res: any) => res.text())
-    //     .then((body: string) => {
-    //         let parser = new xmlParser();
-    //         parser.parseStringPromise(body)
-    //             .then((res: any) => {
-    //                 console.log(JSON.stringify(res));
-    //             });
-    //     });
-
-    // return [];
-
-    //         parseString(xml, function (err, result) {
-    //             console.log(JSON.stringify(result));
 }
 
 const app = express();
@@ -88,5 +68,3 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.info(`Ready on port ${port}`);
 });
-
-//fetchArticlesPerDb("pubmed", ["20021716"]);
