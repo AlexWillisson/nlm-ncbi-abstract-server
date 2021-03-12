@@ -15,6 +15,26 @@ const pool = new pg_1.Pool({
     port: 5432,
 });
 function fetchArticles(ids) {
+    let cacheHits = [];
+    let cacheMisses = [];
+    ids.forEach((externalArticle) => {
+        if (externalArticle.cached_id !== null && externalArticle.cached_id !== 0) {
+            cacheHits.push(externalArticle);
+        }
+        else {
+            cacheMisses.push(externalArticle);
+        }
+    });
+    // fetch cache hits
+    let cachedArticles = new Promise((resolve) => {
+        let articles = [];
+        resolve(articles);
+    });
+    let articles = remoteFetchArticles(cacheMisses);
+    articles.unshift(cachedArticles);
+    return Promise.all(articles);
+}
+function remoteFetchArticles(ids) {
     let splitByType = {};
     let types = [];
     ids.forEach((article) => {
@@ -24,14 +44,13 @@ function fetchArticles(ids) {
         }
         splitByType[article.type].push(article.id);
     });
-    let articlePromiseList = [];
+    let articlePromises = [];
     types.forEach((type) => {
         let articles = fetchArticlesPerDb(type, splitByType[type]);
-        articlePromiseList.push(articles);
+        articlePromises.push(articles);
     });
-    // let articlePromises = Promise.allSettled(articlePromiseList);
-    return Promise.all(articlePromiseList);
-    // return articlePromises;
+    return articlePromises;
+    // return Promise.all(articlePromises);
 }
 function fetchArticlesPerDb(db, ids) {
     let params = {
@@ -123,8 +142,9 @@ app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     fetchArticles(externalArticles)
         .then((values) => {
-        if (values.length > 0) {
-            res.send(JSON.stringify(values[0]));
+        let articles = values.flat(1);
+        if (articles.length > 0) {
+            res.send(JSON.stringify(articles));
         }
         else {
             res.send(JSON.stringify([]));

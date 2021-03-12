@@ -15,6 +15,30 @@ const pool = new Pool({
 })
 
 function fetchArticles(ids: ExternalArticle[]): Promise<ArticleData[][]> {
+    let cacheHits: ExternalArticle[] = [];
+    let cacheMisses: ExternalArticle[] = [];
+
+    ids.forEach((externalArticle: ExternalArticle) => {
+        if (externalArticle.cached_id !== null && externalArticle.cached_id !== 0) {
+            cacheHits.push(externalArticle);
+        } else {
+            cacheMisses.push(externalArticle);
+        }
+    });
+    
+    // fetch cache hits
+    let cachedArticles: Promise<ArticleData[]> = new Promise<ArticleData[]>((resolve: any) => {
+        let articles: ArticleData[] = [];
+        resolve(articles);
+    });
+
+    let articles = remoteFetchArticles(cacheMisses);
+    articles.unshift(cachedArticles);
+
+    return Promise.all(articles);
+}
+
+function remoteFetchArticles(ids: ExternalArticle[]): Promise<ArticleData[]>[] {
     let splitByType: { [type: string]: string[] } = {};
     let types: string[] = [];
 
@@ -33,7 +57,8 @@ function fetchArticles(ids: ExternalArticle[]): Promise<ArticleData[][]> {
         articlePromises.push(articles);
     });
 
-    return Promise.all(articlePromises);
+    return articlePromises;
+    // return Promise.all(articlePromises);
 }
 
 function fetchArticlesPerDb(db: string, ids: string[]): Promise<ArticleData[]> {
@@ -144,8 +169,9 @@ app.get('/', (req, res) => {
 
     fetchArticles(externalArticles)
         .then((values: ArticleData[][]) => {
-            if (values.length > 0) {
-                res.send(JSON.stringify(values[0]));
+            let articles: ArticleData[] = values.flat(1);
+            if (articles.length > 0) {
+                res.send(JSON.stringify(articles));
             } else {
                 res.send(JSON.stringify([]));
             }
