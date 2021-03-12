@@ -42,7 +42,7 @@ function fetchArticlesPerDb(db, ids) {
     };
     let query = new URLSearchParams(params);
     return new Promise((resolve) => {
-        node_fetch_1.default("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + query.toString())
+        node_fetch_1.default('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?' + query.toString())
             .then((res) => res.text())
             .then((body) => {
             let parser = new xml2js_1.Parser();
@@ -54,12 +54,12 @@ function fetchArticlesPerDb(db, ids) {
     });
 }
 function abstractsFromArticles(db, rawArticle) {
-    if (db === "pubmed") {
+    if (db === 'pubmed') {
         return abstractsFromPubmedArticles(rawArticle);
     }
     else {
         let article = {
-            id: "UnsupportedArticleDatabase",
+            id: 'UnsupportedArticleDatabase',
             title: ''
         };
         return [article];
@@ -77,12 +77,12 @@ function abstractsFromPubmedArticles(response) {
             id: id,
             title: title
         };
-        if (typeof rawArticle.MedlineCitation[0].Article[0].Abstract !== "undefined") {
+        if (typeof rawArticle.MedlineCitation[0].Article[0].Abstract !== 'undefined') {
             rawAbstractSections = rawArticle.MedlineCitation[0].Article[0].Abstract[0].AbstractText;
             abstractSections = [];
             rawAbstractSections.forEach((rawSection) => {
                 let section;
-                if (typeof rawSection === "string") {
+                if (typeof rawSection === 'string') {
                     section = {
                         body: rawSection
                     };
@@ -103,7 +103,10 @@ function abstractsFromPubmedArticles(response) {
     });
     return articles;
 }
-pool.query('select external_articles.article_id, types.name, external_articles.cached_id from external_articles join types on external_articles.type = types.id', (error, results) => {
+let columns = ['external_articles.article_id', 'types.name', 'external_articles.cached_id'];
+let join = 'join types on external_articles.type = types.id';
+let queryStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
+pool.query(queryStr, (error, results) => {
     if (error) {
         throw error;
     }
@@ -112,8 +115,8 @@ pool.query('select external_articles.article_id, types.name, external_articles.c
 const app = express_1.default();
 const port = 3000;
 app.get('/', (req, res) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     fetchArticles(articles_1.externalArticles)
         .then((values) => {
         res.send(JSON.stringify(values[0].value));
