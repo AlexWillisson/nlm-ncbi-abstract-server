@@ -27,16 +27,13 @@ function fetchArticles(ids: ExternalArticle[]): Promise<ArticleData[][]> {
         splitByType[article.type].push(article.id);
     });
 
-    let articlePromiseList: Promise<ArticleData[]>[] = [];
+    let articlePromises: Promise<ArticleData[]>[] = [];
     types.forEach((type: string) => {
         let articles = fetchArticlesPerDb(type, splitByType[type]);
-        articlePromiseList.push(articles);
+        articlePromises.push(articles);
     });
 
-    // let articlePromises = Promise.allSettled(articlePromiseList);
-
-    return Promise.all(articlePromiseList);
-    // return articlePromises;
+    return Promise.all(articlePromises);
 }
 
 function fetchArticlesPerDb(db: string, ids: string[]): Promise<ArticleData[]> {
