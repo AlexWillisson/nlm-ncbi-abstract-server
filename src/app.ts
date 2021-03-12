@@ -8,9 +8,18 @@ import { testArticles } from './testArticles';
 import { ExternalArticle, ArticleData, externalArticles } from './articles';
 
 function fetchArticles(ids: number[]): ArticleData[] {
+    let params = {
+        db: 'pubmed',
+        format: 'xml',
+        id: ids.join(',')
+    }
+
+    let query = new URLSearchParams(params);
+    let path = '/entrez/eutils/efetch.fcgi?' + query.toString();
+    
     let options = {
         host: 'eutils.ncbi.nlm.nih.gov',
-        path: '/entrez/eutils/efetch.fcgi?db=pubmed&id=20021716&format=xml'
+        path: path
     };
 
     let callback = function (response: http.IncomingMessage) {

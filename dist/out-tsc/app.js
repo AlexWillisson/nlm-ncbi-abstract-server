@@ -7,10 +7,18 @@ var express_1 = __importDefault(require("express"));
 var https_1 = __importDefault(require("https"));
 var xml2js_1 = require("xml2js");
 var testArticles_1 = require("./testArticles");
-function fetchArticle(id) {
+function fetchArticles(ids) {
+    var params = {
+        db: 'pubmed',
+        format: 'xml',
+        id: ids.join(',')
+    };
+    var query = new URLSearchParams(params);
+    var path = '/entrez/eutils/efetch.fcgi?' + query.toString();
+    console.log(path);
     var options = {
         host: 'eutils.ncbi.nlm.nih.gov',
-        path: '/entrez/eutils/efetch.fcgi?db=pubmed&id=20021716&format=xml'
+        path: path
     };
     var callback = function (response) {
         var xml = '';
@@ -27,7 +35,7 @@ function fetchArticle(id) {
     https_1.default.request(options, callback).end();
     return [];
 }
-fetchArticle(20021716);
+fetchArticles([20021716]);
 var app = express_1.default();
 var port = 3000;
 app.get('/', function (req, res) {
