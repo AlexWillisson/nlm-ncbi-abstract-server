@@ -1,47 +1,59 @@
 import express from 'express';
-import https from 'https';
+// import https from 'https';
 import http from 'http';
+import fetch from 'node-fetch';
 
 import { parseString } from 'xml2js';
 
 import { testArticles } from './testArticles';
 import { ExternalArticle, ArticleData, externalArticles } from './articles';
 
-function fetchArticles(ids: number[]): ArticleData[] {
+function fetchArticles(ids: ExternalArticle[]): ArticleData[] {
+    let splitByType: { [type: string]: string[] } = {};
+    let types: string[] = [];
+
+    ids.forEach((article: ExternalArticle) => {
+        if (article.type in splitByType === false) {
+            types.push(article.type);
+            splitByType[article.type] = [];
+        }
+
+        splitByType[article.type].push(article.id);
+    });
+
+    let collectedArticles: ArticleData[] = [];
+    types.forEach((type: string) => {
+        let articles = fetchArticlesPerDb(type, splitByType[type]);
+        collectedArticles = collectedArticles.concat(articles);
+    });
+
+    return collectedArticles;
+}
+
+function fetchArticlesPerDb(db: string, ids: string[]): ArticleData[] {
     let params = {
-        db: 'pubmed',
+        db: db,
         format: 'xml',
         id: ids.join(',')
     }
 
     let query = new URLSearchParams(params);
-    let path = '/entrez/eutils/efetch.fcgi?' + query.toString();
-    
-    let options = {
-        host: 'eutils.ncbi.nlm.nih.gov',
-        path: path
-    };
 
-    let callback = function (response: http.IncomingMessage) {
-        var xml = '';
-        var fetchResults = '';
-
-        response.on('data', function (chunk) {
-            xml += chunk;
+    fetch("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + query.toString())
+        .then((res: any) => res.text())
+        .then((body: string) => {
+            console.log(body)
         });
-
-        response.on('end', function () {
-            parseString(xml, function (err, result) {
-                console.log(JSON.stringify(result));
-            });
-        });
-    }
-
-    https.request(options, callback).end();
 
     return [];
+
+    //         parseString(xml, function (err, result) {
+    //             console.log(JSON.stringify(result));
 }
-fetchArticles([20021716]);
+
+fetchArticles(externalArticles);
+
+//fetchArticlesPerDb("pubmed", ["20021716"]);
 
 const app = express();
 const port = 3000;
