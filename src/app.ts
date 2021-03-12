@@ -147,7 +147,11 @@ app.get('/', (req, res) => {
 
     fetchArticles(externalArticles)
         .then((values: any) => {
-            res.send(JSON.stringify(values[0].value));
+            if (values.length > 0) {
+                res.send(JSON.stringify(values[0].value));
+            } else {
+                res.send(JSON.stringify([]));
+            }
         });
 });
 app.listen(port, () => {

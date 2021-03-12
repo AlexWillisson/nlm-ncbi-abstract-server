@@ -107,14 +107,17 @@ const articleIdFetchQueue = new Promise((resolve) => {
     let columns = ['external_articles.article_id as id', 'types.name as type', 'external_articles.cached_id'];
     let join = 'join types on external_articles.type = types.id';
     let queryStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
-    pool.query(queryStr, (error, results) => {
-        if (error) {
-            throw error;
-        }
-        results.rows.forEach((row) => {
-            externalArticles.push(row);
+    setTimeout(() => {
+        console.log("query now");
+        pool.query(queryStr, (error, results) => {
+            if (error) {
+                throw error;
+            }
+            results.rows.forEach((row) => {
+                externalArticles.push(row);
+            });
         });
-    });
+    }, 5000);
 });
 const app = express_1.default();
 const port = 3000;
@@ -123,7 +126,12 @@ app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     fetchArticles(externalArticles)
         .then((values) => {
-        res.send(JSON.stringify(values[0].value));
+        if (values.length > 0) {
+            res.send(JSON.stringify(values[0].value));
+        }
+        else {
+            res.send(JSON.stringify([]));
+        }
     });
 });
 app.listen(port, () => {
