@@ -3,7 +3,7 @@ import express from 'express';
 import http from 'http';
 import fetch from 'node-fetch';
 
-import { parseString } from 'xml2js';
+import { Parser as xmlParser } from 'xml2js';
 
 import { testArticles } from './testArticles';
 import { ExternalArticle, ArticleData, externalArticles } from './articles';
@@ -21,16 +21,20 @@ function fetchArticles(ids: ExternalArticle[]): ArticleData[] {
         splitByType[article.type].push(article.id);
     });
 
-    let collectedArticles: ArticleData[] = [];
+    // let collectedArticles: ArticleData[] = [];
     types.forEach((type: string) => {
         let articles = fetchArticlesPerDb(type, splitByType[type]);
-        collectedArticles = collectedArticles.concat(articles);
+        articles.then((res: any) => {
+            console.log(JSON.stringify(res));
+        });
+        // collectedArticles = collectedArticles.concat(articles);
     });
 
-    return collectedArticles;
+    return [];
+    // return collectedArticles;
 }
 
-function fetchArticlesPerDb(db: string, ids: string[]): ArticleData[] {
+function fetchArticlesPerDb(db: string, ids: string[]): Promise<any> {
     let params = {
         db: db,
         format: 'xml',
@@ -39,13 +43,28 @@ function fetchArticlesPerDb(db: string, ids: string[]): ArticleData[] {
 
     let query = new URLSearchParams(params);
 
-    fetch("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + query.toString())
+    return new Promise<any>((resolve: any) => {
+        fetch("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + query.toString())
         .then((res: any) => res.text())
         .then((body: string) => {
-            console.log(body)
+            let parser = new xmlParser();
+            parser.parseStringPromise(body)
+                .then((res: any) => {
+                    resolve(res);
+                });
         });
+    });
+    // fetch("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + query.toString())
+    //     .then((res: any) => res.text())
+    //     .then((body: string) => {
+    //         let parser = new xmlParser();
+    //         parser.parseStringPromise(body)
+    //             .then((res: any) => {
+    //                 console.log(JSON.stringify(res));
+    //             });
+    //     });
 
-    return [];
+    // return [];
 
     //         parseString(xml, function (err, result) {
     //             console.log(JSON.stringify(result));

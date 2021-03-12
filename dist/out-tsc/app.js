@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 var express_1 = __importDefault(require("express"));
 var node_fetch_1 = __importDefault(require("node-fetch"));
+var xml2js_1 = require("xml2js");
 var testArticles_1 = require("./testArticles");
 var articles_1 = require("./articles");
 function fetchArticles(ids) {
@@ -17,12 +18,16 @@ function fetchArticles(ids) {
         }
         splitByType[article.type].push(article.id);
     });
-    var collectedArticles = [];
+    // let collectedArticles: ArticleData[] = [];
     types.forEach(function (type) {
         var articles = fetchArticlesPerDb(type, splitByType[type]);
-        collectedArticles = collectedArticles.concat(articles);
+        articles.then(function (res) {
+            console.log(JSON.stringify(res));
+        });
+        // collectedArticles = collectedArticles.concat(articles);
     });
-    return collectedArticles;
+    return [];
+    // return collectedArticles;
 }
 function fetchArticlesPerDb(db, ids) {
     var params = {
@@ -31,31 +36,29 @@ function fetchArticlesPerDb(db, ids) {
         id: ids.join(',')
     };
     var query = new URLSearchParams(params);
-    node_fetch_1.default("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + query.toString())
-        .then(function (res) { return res.text(); })
-        .then(function (body) {
-        console.log(body);
+    return new Promise(function (resolve) {
+        node_fetch_1.default("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + query.toString())
+            .then(function (res) { return res.text(); })
+            .then(function (body) {
+            var parser = new xml2js_1.Parser();
+            parser.parseStringPromise(body)
+                .then(function (res) {
+                resolve(res);
+            });
+        });
     });
-    return [];
-    // let path = '/entrez/eutils/efetch.fcgi?' 
-    // let options = {
-    //     host: 'eutils.ncbi.nlm.nih.gov',
-    //     path: path
-    // };
-    // let callback = function (response: http.IncomingMessage) {
-    //     var xml = '';
-    //     var fetchResults = '';
-    //     response.on('data', function (chunk) {
-    //         xml += chunk;
+    // fetch("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + query.toString())
+    //     .then((res: any) => res.text())
+    //     .then((body: string) => {
+    //         let parser = new xmlParser();
+    //         parser.parseStringPromise(body)
+    //             .then((res: any) => {
+    //                 console.log(JSON.stringify(res));
+    //             });
     //     });
-    //     response.on('end', function () {
+    // return [];
     //         parseString(xml, function (err, result) {
     //             console.log(JSON.stringify(result));
-    //         });
-    //     });
-    // }
-    // https.request(options, callback).end();
-    // return [];
 }
 fetchArticles(articles_1.externalArticles);
 //fetchArticlesPerDb("pubmed", ["20021716"]);
