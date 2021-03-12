@@ -2,7 +2,6 @@ import express from 'express';
 import fetch from 'node-fetch';
 import { Parser as xmlParser } from 'xml2js';
 import { Pool } from 'pg';
-import { Observable } from 'rxjs';
 
 import { ExternalArticle, ArticleData, AbstractSection } from './articles';
 
