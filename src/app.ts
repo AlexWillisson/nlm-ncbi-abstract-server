@@ -8,7 +8,7 @@ import { Parser as xmlParser } from 'xml2js';
 import { testArticles } from './testArticles';
 import { ExternalArticle, ArticleData, externalArticles } from './articles';
 
-function fetchArticles(ids: ExternalArticle[]): ArticleData[] {
+function fetchArticles(ids: ExternalArticle[]): Promise<any> {
     let splitByType: { [type: string]: string[] } = {};
     let types: string[] = [];
 
@@ -22,16 +22,20 @@ function fetchArticles(ids: ExternalArticle[]): ArticleData[] {
     });
 
     // let collectedArticles: ArticleData[] = [];
+    let articlePromiseList: Promise<any>[] = [];
     types.forEach((type: string) => {
         let articles = fetchArticlesPerDb(type, splitByType[type]);
-        articles.then((res: any) => {
-            console.log(JSON.stringify(res));
-        });
+        articlePromiseList.push(articles);
+        // articles.then((res: any) => {
+        //     console.log(JSON.stringify(res));
+        // });
         // collectedArticles = collectedArticles.concat(articles);
     });
 
-    return [];
-    // return collectedArticles;
+    let articlePromises = Promise.allSettled(articlePromiseList);
+
+    // return Promise.all(articlePromises);
+    return articlePromises;
 }
 
 function fetchArticlesPerDb(db: string, ids: string[]): Promise<any> {
@@ -45,14 +49,14 @@ function fetchArticlesPerDb(db: string, ids: string[]): Promise<any> {
 
     return new Promise<any>((resolve: any) => {
         fetch("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + query.toString())
-        .then((res: any) => res.text())
-        .then((body: string) => {
-            let parser = new xmlParser();
-            parser.parseStringPromise(body)
-                .then((res: any) => {
-                    resolve(res);
-                });
-        });
+            .then((res: any) => res.text())
+            .then((body: string) => {
+                let parser = new xmlParser();
+                parser.parseStringPromise(body)
+                    .then((res: any) => {
+                        resolve(res);
+                    });
+            });
     });
     // fetch("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + query.toString())
     //     .then((res: any) => res.text())
@@ -70,18 +74,19 @@ function fetchArticlesPerDb(db: string, ids: string[]): Promise<any> {
     //             console.log(JSON.stringify(result));
 }
 
-fetchArticles(externalArticles);
-
-//fetchArticlesPerDb("pubmed", ["20021716"]);
-
 const app = express();
 const port = 3000;
 app.get('/', (req, res) => {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
 
-    res.send(JSON.stringify(testArticles));
+    fetchArticles(externalArticles)
+        .then((values: any) => {
+            res.send(JSON.stringify(values));
+        });
 });
 app.listen(port, () => {
     console.info(`Ready on port ${port}`);
 });
+
+//fetchArticlesPerDb("pubmed", ["20021716"]);
