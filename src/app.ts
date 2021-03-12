@@ -120,7 +120,10 @@ function abstractsFromPubmedArticles(response: any): ArticleData[] {
     return articles;
 }
 
-pool.query('select external_articles.article_id, types.name from external_articles join types on external_articles.type = types.id', (error, results) => {
+let columns = ['external_articles.article_id', 'types.name', 'external_articles.cached_id'];
+let join = 'join types on external_articles.type = types.id';
+let queryStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
+pool.query(queryStr, (error, results) => {
     if (error) {
         throw error
     }

@@ -103,8 +103,7 @@ function abstractsFromPubmedArticles(response) {
     });
     return articles;
 }
-pool.query('select external_articles.article_id, types.name from external_articles join types on external_articles.type = types.id', (error, results) => {
-    // pool.query('select 1', (error, results) => {
+pool.query('select external_articles.article_id, types.name, external_articles.cached_id from external_articles join types on external_articles.type = types.id', (error, results) => {
     if (error) {
         throw error;
     }
