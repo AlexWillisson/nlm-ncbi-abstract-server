@@ -73,11 +73,19 @@ function abstractsFromPubmedArticles(response) {
             rawAbstractSections = rawArticle.MedlineCitation[0].Article[0].Abstract[0].AbstractText;
             abstractSections = [];
             rawAbstractSections.forEach((rawSection) => {
-                let section = {
-                    body: rawSection['_']
-                };
-                if (rawSection['$'] && rawSection['$'].Label) {
-                    section.label = rawSection['$'].Label;
+                let section;
+                if (typeof rawSection === "string") {
+                    section = {
+                        body: rawSection
+                    };
+                }
+                else {
+                    section = {
+                        body: rawSection['_']
+                    };
+                    if (rawSection['$'] && rawSection['$'].Label) {
+                        section.label = rawSection['$'].Label.toLowerCase();
+                    }
                 }
                 abstractSections.push(section);
             });

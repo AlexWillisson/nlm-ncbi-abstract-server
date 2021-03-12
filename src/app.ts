@@ -75,7 +75,7 @@ function abstractsFromPubmedArticles(response: any): ArticleData[] {
         let rawAbstractSections: any[];
         id = rawArticle.MedlineCitation[0].PMID[0]['_'];
         title = rawArticle.MedlineCitation[0].Article[0].ArticleTitle;
-    
+
         let article: ArticleData = {
             id: id,
             title: title
@@ -86,12 +86,20 @@ function abstractsFromPubmedArticles(response: any): ArticleData[] {
             abstractSections = [];
 
             rawAbstractSections.forEach((rawSection: any) => {
-                let section: AbstractSection = {
-                    body: rawSection['_']
-                }
+                let section: AbstractSection;
 
-                if (rawSection['$'] && rawSection['$'].Label) {
-                    section.label = rawSection['$'].Label;
+                if (typeof rawSection === "string") {
+                    section = {
+                        body: rawSection
+                    }
+                } else {
+                    section = {
+                        body: rawSection['_']
+                    }
+
+                    if (rawSection['$'] && rawSection['$'].Label) {
+                        section.label = rawSection['$'].Label.toLowerCase();
+                    }
                 }
 
                 abstractSections.push(section);
