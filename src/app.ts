@@ -14,6 +14,7 @@ const pool = new Pool({
     port: 5432,
 })
 
+// TODO: generates uncached entries for cache misses
 function fetchArticles(ids: ExternalArticle[]): Promise<ArticleData[][]> {
     let cacheHits: ExternalArticle[] = [];
     let cacheMisses: ExternalArticle[] = [];
@@ -26,7 +27,7 @@ function fetchArticles(ids: ExternalArticle[]): Promise<ArticleData[][]> {
         }
     });
     
-    // fetch cache hits
+    // TODO: fetch cache hits
     let cachedArticles: Promise<ArticleData[]> = new Promise<ArticleData[]>((resolve: any) => {
         let articles: ArticleData[] = [];
         resolve(articles);
@@ -58,7 +59,15 @@ function remoteFetchArticles(ids: ExternalArticle[]): Promise<ArticleData[]>[] {
     });
 
     return articlePromises;
-    // return Promise.all(articlePromises);
+}
+
+function cacheArticles(articles: ArticleData[]): void {
+    // check if any articles are already cached
+    //externalArticleIdsFromDb
+
+    articles.forEach((article: ArticleData) => {
+
+    });
 }
 
 function fetchArticlesPerDb(db: string, ids: string[]): Promise<ArticleData[]> {
@@ -76,7 +85,9 @@ function fetchArticlesPerDb(db: string, ids: string[]): Promise<ArticleData[]> {
                 let parser = new xmlParser();
                 parser.parseStringPromise(body)
                     .then((res: any) => {
-                        resolve(abstractsFromArticles(db, res));
+                        let articleData: ArticleData[] = abstractsFromArticles(db, res);
+                        cacheArticles(articleData);
+                        resolve(articleData);
                     });
             });
     });
@@ -143,23 +154,35 @@ function abstractsFromPubmedArticles(response: any): ArticleData[] {
     return articles;
 }
 
-var externalArticles: ExternalArticle[] = [];
 
-const articleIdFetchQueue = new Promise((resolve: any) => {
-    let columns = ['external_articles.article_id as id', 'types.name as type', 'external_articles.cached_id'];
-    let join = 'join types on external_articles.type = types.id';
-    let queryStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
+// Pass in [] for IDs to get all articles
+function externalArticleIdsFromDb(ids: string[]): Promise<ExternalArticle[]> {
+    return new Promise((resolve: any) => {
+        let columns = ['external_articles.article_id as id', 'types.name as type', 'external_articles.cached_id'];
+        let join = 'join types on external_articles.type = types.id';
+        // let condition = ' where id in ' + ids.join(',');
 
-    pool.query(queryStr, (error, results) => {
-        if (error) {
-            throw error
-        }
+        let queryStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
 
-        results.rows.forEach((row: ExternalArticle) => {
-            externalArticles.push(row);
+        pool.query(queryStr, (error, results) => {
+            if (error) {
+                throw error
+            }
+    
+            let articles: ExternalArticle[] = [];
+            results.rows.forEach((row: ExternalArticle) => {
+                articles.push(row);
+            });
+
+            resolve(articles);
         });
-    });
-})
+    })
+}
+
+var externalArticles: ExternalArticle[] = [];
+externalArticleIdsFromDb([]).then((resolve: any) => {
+    externalArticles = resolve;
+});
 
 const app = express();
 const port = 3000;
