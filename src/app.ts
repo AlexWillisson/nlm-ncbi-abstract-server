@@ -1,7 +1,5 @@
 import express from 'express';
-import http from 'http';
 import fetch from 'node-fetch';
-import { ExceptionHandler } from 'winston';
 
 import { Parser as xmlParser } from 'xml2js';
 
