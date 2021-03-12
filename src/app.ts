@@ -29,7 +29,6 @@ function fetchArticle(id: number): ArticleData[] {
 }
 fetchArticle(20021716);
 
-
 const app = express();
 const port = 3000;
 app.get('/', (req, res) => {
