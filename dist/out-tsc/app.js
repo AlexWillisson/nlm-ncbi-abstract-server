@@ -29,9 +29,9 @@ function fetchArticles(ids) {
         let articles = fetchArticlesPerDb(type, splitByType[type]);
         articlePromiseList.push(articles);
     });
-    let articlePromises = Promise.allSettled(articlePromiseList);
-    // return Promise.all(articlePromises);
-    return articlePromises;
+    // let articlePromises = Promise.allSettled(articlePromiseList);
+    return Promise.all(articlePromiseList);
+    // return articlePromises;
 }
 function fetchArticlesPerDb(db, ids) {
     let params = {
@@ -107,17 +107,14 @@ const articleIdFetchQueue = new Promise((resolve) => {
     let columns = ['external_articles.article_id as id', 'types.name as type', 'external_articles.cached_id'];
     let join = 'join types on external_articles.type = types.id';
     let queryStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
-    setTimeout(() => {
-        console.log("query now");
-        pool.query(queryStr, (error, results) => {
-            if (error) {
-                throw error;
-            }
-            results.rows.forEach((row) => {
-                externalArticles.push(row);
-            });
+    pool.query(queryStr, (error, results) => {
+        if (error) {
+            throw error;
+        }
+        results.rows.forEach((row) => {
+            externalArticles.push(row);
         });
-    }, 5000);
+    });
 });
 const app = express_1.default();
 const port = 3000;
@@ -127,7 +124,7 @@ app.get('/', (req, res) => {
     fetchArticles(externalArticles)
         .then((values) => {
         if (values.length > 0) {
-            res.send(JSON.stringify(values[0].value));
+            res.send(JSON.stringify(values[0]));
         }
         else {
             res.send(JSON.stringify([]));

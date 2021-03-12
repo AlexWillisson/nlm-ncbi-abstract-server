@@ -14,7 +14,7 @@ const pool = new Pool({
     port: 5432,
 })
 
-function fetchArticles(ids: ExternalArticle[]): Promise<any> {
+function fetchArticles(ids: ExternalArticle[]): Promise<ArticleData[][]> {
     let splitByType: { [type: string]: string[] } = {};
     let types: string[] = [];
 
@@ -27,19 +27,19 @@ function fetchArticles(ids: ExternalArticle[]): Promise<any> {
         splitByType[article.type].push(article.id);
     });
 
-    let articlePromiseList: Promise<any>[] = [];
+    let articlePromiseList: Promise<ArticleData[]>[] = [];
     types.forEach((type: string) => {
         let articles = fetchArticlesPerDb(type, splitByType[type]);
         articlePromiseList.push(articles);
     });
 
-    let articlePromises = Promise.allSettled(articlePromiseList);
+    // let articlePromises = Promise.allSettled(articlePromiseList);
 
-    // return Promise.all(articlePromises);
-    return articlePromises;
+    return Promise.all(articlePromiseList);
+    // return articlePromises;
 }
 
-function fetchArticlesPerDb(db: string, ids: string[]): Promise<any> {
+function fetchArticlesPerDb(db: string, ids: string[]): Promise<ArticleData[]> {
     let params = {
         db: db,
         format: 'xml',
@@ -47,7 +47,7 @@ function fetchArticlesPerDb(db: string, ids: string[]): Promise<any> {
     }
 
     let query = new URLSearchParams(params);
-    return new Promise<any>((resolve: any) => {
+    return new Promise<ArticleData[]>((resolve: any) => {
         fetch('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?' + query.toString())
             .then((res: any) => res.text())
             .then((body: string) => {
@@ -146,9 +146,9 @@ app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
 
     fetchArticles(externalArticles)
-        .then((values: any) => {
+        .then((values: ArticleData[][]) => {
             if (values.length > 0) {
-                res.send(JSON.stringify(values[0].value));
+                res.send(JSON.stringify(values[0]));
             } else {
                 res.send(JSON.stringify([]));
             }
