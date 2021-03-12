@@ -78,7 +78,25 @@ function cacheArticles(externalArticles: ExternalArticle[], articles: ArticleDat
     });
 
     articles.forEach((article: ArticleData) => {
-        console.log(article);
+        let columns = ['article_id', 'title', 'abstract', "cache_date"];
+        let queryStr = 'insert into cached_articles (' + columns.join(',') + ') values ($1, $2, $3, now()) returning id';
+        let values = [article.id, article.title, JSON.stringify(article.abstract)];
+
+        pool.query(queryStr, values, (error, results) => {
+            if (error) {
+                throw error
+            }
+
+            let externalArticle = externalArticleLookupTable[idHash(article.id, article.articleType)];
+
+            let queryStr = 'update external_articles set cached_id=$1 where id=$2';
+            let values = [results.rows[0].id, externalArticle.externalArticleId];
+            pool.query(queryStr, values, (error, results) => {
+                if (error) {
+                    throw error
+                }
+            });
+        });
     });
 }
 
@@ -202,7 +220,7 @@ function externalArticleByIdFromDb(id: number): Promise<ExternalArticle[]> {
 // Pass in [] for IDs to get all articles
 function externalArticleIdsFromDb(ids: string[]): Promise<ExternalArticle[]> {
     return new Promise((resolve: any) => {
-        let columns = ['external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
+        let columns = ['external_articles.id', 'external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
         let join = 'join types on external_articles.type = types.id';
 
         let baseStr = 'select ' + columns.join(',') + ' from external_articles ' + join;

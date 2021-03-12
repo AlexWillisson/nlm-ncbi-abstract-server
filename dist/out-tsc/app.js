@@ -66,7 +66,27 @@ function cacheArticles(externalArticles, articles) {
         externalArticleLookupTable[hashedId] = externalArticle;
     });
     articles.forEach((article) => {
-        console.log(article);
+        // create table cached_articles (id serial primary key, article_id text, title text, abstract json, cache_date timestamp);
+        // insert into cached_articles (article_id, title, abstract, cache_date) values ($1, $2, $3, now()) returning id;
+        let columns = ['article_id', 'title', 'abstract', "cache_date"];
+        let queryStr = 'insert into cached_articles (' + columns.join(',') + ') values ($1, $2, $3, now()) returning id';
+        let values = [article.id, article.title, JSON.stringify(article.abstract)];
+        pool.query(queryStr, values, (error, results) => {
+            if (error) {
+                throw error;
+            }
+            let externalArticle = externalArticleLookupTable[idHash(article.id, article.articleType)];
+            let queryStr = 'update external_articles set cached_id=$1 where id=$2';
+            let values = [results.rows[0].id, externalArticle.externalArticleId];
+            console.log(queryStr);
+            console.log(values);
+            pool.query(queryStr, values, (error, results) => {
+                if (error) {
+                    throw error;
+                }
+                // console.log(results);
+            });
+        });
     });
 }
 function fetchArticlesPerDb(db, externalArticles) {
@@ -170,7 +190,7 @@ function externalArticleByIdFromDb(id) {
 // Pass in [] for IDs to get all articles
 function externalArticleIdsFromDb(ids) {
     return new Promise((resolve) => {
-        let columns = ['external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
+        let columns = ['external_articles.id', 'external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
         let join = 'join types on external_articles.type = types.id';
         let baseStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
         let queryStr;
