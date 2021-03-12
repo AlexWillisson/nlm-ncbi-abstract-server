@@ -2,6 +2,7 @@ import express from 'express';
 import fetch from 'node-fetch';
 import { Parser as xmlParser } from 'xml2js';
 import { Pool } from 'pg';
+import { Observable } from 'rxjs/Observable';
 
 import { ExternalArticle, ArticleData, AbstractSection, externalArticles } from './articles';
 
@@ -47,7 +48,7 @@ function fetchArticlesPerDb(db: string, ids: string[]): Promise<any> {
 
     let query = new URLSearchParams(params);
     return new Promise<any>((resolve: any) => {
-        fetch("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?" + query.toString())
+        fetch('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?' + query.toString())
             .then((res: any) => res.text())
             .then((body: string) => {
                 let parser = new xmlParser();
@@ -60,11 +61,11 @@ function fetchArticlesPerDb(db: string, ids: string[]): Promise<any> {
 }
 
 function abstractsFromArticles(db: string, rawArticle: any): ArticleData[] {
-    if (db === "pubmed") {
+    if (db === 'pubmed') {
         return abstractsFromPubmedArticles(rawArticle);
     } else {
         let article: ArticleData = {
-            id: "UnsupportedArticleDatabase",
+            id: 'UnsupportedArticleDatabase',
             title: ''
         }
 
@@ -87,14 +88,14 @@ function abstractsFromPubmedArticles(response: any): ArticleData[] {
             title: title
         };
 
-        if (typeof rawArticle.MedlineCitation[0].Article[0].Abstract !== "undefined") {
+        if (typeof rawArticle.MedlineCitation[0].Article[0].Abstract !== 'undefined') {
             rawAbstractSections = rawArticle.MedlineCitation[0].Article[0].Abstract[0].AbstractText;
             abstractSections = [];
 
             rawAbstractSections.forEach((rawSection: any) => {
                 let section: AbstractSection;
 
-                if (typeof rawSection === "string") {
+                if (typeof rawSection === 'string') {
                     section = {
                         body: rawSection
                     }
@@ -134,8 +135,8 @@ pool.query(queryStr, (error, results) => {
 const app = express();
 const port = 3000;
 app.get('/', (req, res) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
 
     fetchArticles(externalArticles)
         .then((values: any) => {
