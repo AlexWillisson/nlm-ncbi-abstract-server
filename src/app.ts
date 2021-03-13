@@ -33,9 +33,7 @@ function fetchArticles(ids: number[]): Promise<ArticleData[][]> {
 
             articles.push(fetchArticlesFromCache(cacheHits));
 
-
             articles = articles.concat(remoteFetchArticles(cacheMisses));
-            // articles.unshift(cachedArticles);
 
             resolve(Promise.all(articles));
         });
