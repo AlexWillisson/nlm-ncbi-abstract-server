@@ -19,13 +19,21 @@ function fetchArticles(ids: ExternalArticle[]): Promise<ArticleData[][]> {
     let cacheHits: ExternalArticle[] = [];
     let cacheMisses: ExternalArticle[] = [];
 
+    let cacheChecks: Promise<ExternalArticle>[] = [];
     ids.forEach((externalArticle: ExternalArticle) => {
         if (externalArticle.cached_id !== null && externalArticle.cached_id !== 0) {
             cacheHits.push(externalArticle);
         } else {
-            cacheMisses.push(externalArticle);
+            cacheChecks.push(externalArticleByIdFromDb(externalArticle.externalArticleId));
         }
     });
+
+    Promise.allSettled(cacheChecks)
+        .then((externalArticlePromises: PromiseSettledResult<ExternalArticle>[]) => {
+            // this should have a list of settled promises I can re-combine to cacheMisses
+        });
+
+    // in allSettled, remoteFetchArticles will come next, then we'll collect the cache hits from the database
 
     // TODO: fetch cache hits
     let cachedArticles: Promise<ArticleData[]> = new Promise<ArticleData[]>((resolve: any) => {
@@ -188,31 +196,27 @@ function abstractsFromPubmedArticles(response: any, db: ArticleType): ArticleDat
     return articles;
 }
 
-function externalArticleByIdFromDb(id: number): Promise<ExternalArticle[]> {
+function externalArticleByIdFromDb(id: number): Promise<ExternalArticle> {
     return new Promise((resolve: any) => {
         let columns = ['external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
         let join = 'join types on external_articles.type = types.id';
 
         let baseStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
-        let queryStr = pgFormat(baseStr + ' where external_articles.id = %L', id);
+        let queryStr = pgFormat(baseStr + ' where external_articles.id = %L limit 1', id);
 
         pool.query(queryStr, (error, results) => {
             if (error) {
                 throw error
             }
 
-            let articles: ExternalArticle[] = [];
-            results.rows.forEach((row: any) => {
-                let article: ExternalArticle = {
-                    id: row.article_id,
-                    type: row.type,
-                    cached_id: row.cached_id,
-                    externalArticleId: row.id
-                };
-                articles.push(article);
-            });
+            let article: ExternalArticle = {
+                id: results.rows[0].article_id,
+                type: results.rows[0].type,
+                cached_id: results.rows[0].cached_id,
+                externalArticleId: results.rows[0].id
+            };
 
-            resolve(articles);
+            resolve(article);
         });
     })
 }
