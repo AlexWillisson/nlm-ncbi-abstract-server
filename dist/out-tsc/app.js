@@ -22,7 +22,7 @@ function fetchArticles(ids) {
             let cacheHits = [];
             let cacheMisses = [];
             externalArticles.forEach((externalArticle) => {
-                if (externalArticle.cached_id !== null && externalArticle.cached_id !== 0) {
+                if (externalArticle.cache_id !== null && externalArticle.cache_id !== 0) {
                     cacheHits.push(externalArticle);
                 }
                 else {
@@ -44,8 +44,8 @@ function fetchArticlesFromCache(articles) {
     }
     return new Promise((resolve) => {
         let columns = ['article_id', 'title', 'abstract', 'source'];
-        let ids = articles.map((article) => article.cached_id);
-        let baseStr = 'select ' + columns.join(',') + ' from cached_articles where id in (%s) order by article_id';
+        let ids = articles.map((article) => article.cache_id);
+        let baseStr = 'select ' + columns.join(',') + ' from article_cache where id in (%s) order by article_id';
         let queryStr = pgFormat(baseStr, ids);
         pool.query(queryStr, (error, results) => {
             if (error) {
@@ -98,14 +98,14 @@ function cacheArticles(externalArticles, articles) {
     });
     articles.forEach((article) => {
         let columns = ['article_id', 'title', 'abstract', "source", "cache_date"];
-        let queryStr = 'insert into cached_articles (' + columns.join(',') + ') values ($1, $2, $3, $4, now()) returning id';
+        let queryStr = 'insert into article_cache (' + columns.join(',') + ') values ($1, $2, $3, $4, now()) returning id';
         let values = [article.id, article.title, JSON.stringify(article.abstract), article.articleSource];
         pool.query(queryStr, values, (error, results) => {
             if (error) {
                 throw error;
             }
             let externalArticle = externalArticleLookupTable[idHash(article.id, article.articleSource)];
-            let queryStr = 'update external_articles set cached_id=$1 where id=$2';
+            let queryStr = 'update external_articles set cache_id=$1 where id=$2';
             let values = [results.rows[0].id, externalArticle.id];
             pool.query(queryStr, values, (error, results) => {
                 if (error) {
@@ -193,7 +193,7 @@ function abstractsFromPubmedArticles(response, remoteDb) {
 // Pass in [] for IDs to get all articles
 function externalArticleIdsFromBackend(ids) {
     return new Promise((resolve) => {
-        let columns = ['external_articles.id', 'external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
+        let columns = ['external_articles.id', 'external_articles.article_id', 'types.name as type', 'external_articles.cache_id'];
         let join = 'join types on external_articles.type = types.id';
         let baseStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
         let queryStr;
@@ -213,7 +213,7 @@ function externalArticleIdsFromBackend(ids) {
                 let article = {
                     publicId: row.article_id,
                     type: row.type,
-                    cached_id: row.cached_id,
+                    cache_id: row.cache_id,
                     id: row.id
                 };
                 articles.push(article);

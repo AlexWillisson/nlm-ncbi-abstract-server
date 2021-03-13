@@ -50,7 +50,7 @@ function fetchArticlesFromCache(articles: ExternalArticle[]): Promise<ArticleDat
         let columns = ['article_id', 'title', 'abstract', 'source'];
         let ids = articles.map((article: ExternalArticle) => article.cache_id);
 
-        let baseStr = 'select ' + columns.join(',') + ' from cached_articles where id in (%s) order by article_id';
+        let baseStr = 'select ' + columns.join(',') + ' from article_cache where id in (%s) order by article_id';
         let queryStr = pgFormat(baseStr, ids);
 
         pool.query(queryStr, (error, results) => {
@@ -118,7 +118,7 @@ function cacheArticles(externalArticles: ExternalArticle[], articles: ArticleDat
 
     articles.forEach((article: ArticleData) => {
         let columns = ['article_id', 'title', 'abstract', "source", "cache_date"];
-        let queryStr = 'insert into cached_articles (' + columns.join(',') + ') values ($1, $2, $3, $4, now()) returning id';
+        let queryStr = 'insert into article_cache (' + columns.join(',') + ') values ($1, $2, $3, $4, now()) returning id';
         let values = [article.id, article.title, JSON.stringify(article.abstract), article.articleSource];
 
         pool.query(queryStr, values, (error, results) => {
@@ -157,7 +157,7 @@ function fetchArticlesPerRemoteDb(remoteDb: string, externalArticles: ExternalAr
                 let parser = new xmlParser();
                 parser.parseStringPromise(body)
                     .then((res: any) => {
-                        let articleData: ArticleData[] = abstractsFromArticles(remoteDb, res);
+                        let articleData: ArticleData[] = dataFromExternalArticleSource(remoteDb, res);
                         cacheArticles(externalArticles, articleData);
                         resolve(articleData);
                     });
@@ -165,9 +165,9 @@ function fetchArticlesPerRemoteDb(remoteDb: string, externalArticles: ExternalAr
     });
 }
 
-function abstractsFromArticles(remoteDb: string, rawArticle: any): ArticleData[] {
+function dataFromExternalArticleSource(remoteDb: string, rawArticle: any): ArticleData[] {
     if (remoteDb === 'pubmed') {
-        return abstractsFromPubmedArticles(rawArticle, 'pubmed');
+        return dataFromPubmedArticles(rawArticle, 'pubmed');
     } else {
         let article: ArticleData = {
             id: 'UnsupportedArticleDatabase',
@@ -179,7 +179,7 @@ function abstractsFromArticles(remoteDb: string, rawArticle: any): ArticleData[]
     }
 }
 
-function abstractsFromPubmedArticles(response: any, remoteDb: ArticleType): ArticleData[] {
+function dataFromPubmedArticles(response: any, remoteDb: ArticleType): ArticleData[] {
     let rawArticles: any[] = response.PubmedArticleSet.PubmedArticle;
     let articles: ArticleData[] = [];
 
