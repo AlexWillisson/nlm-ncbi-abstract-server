@@ -10,7 +10,7 @@ export interface ExternalArticle {
 export interface ArticleData {
     id: string;
     title: string;
-    articleType: ArticleType;
+    articleSource: ArticleType;
     abstract?: AbstractSection[];
 }
 

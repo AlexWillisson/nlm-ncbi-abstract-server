@@ -43,6 +43,55 @@ function fetchArticles(ids: number[]): Promise<ArticleData[][]> {
 }
 
 function fetchArticlesFromCache(articles: ExternalArticle[]): Promise<ArticleData[]> {
+    let columns = ['article_id', 'title', 'abstract', 'article_source'];
+
+    // id         | integer                     |           | not null | nextval('cached_articles_id_seq'::regclass)
+    // article_id | text                        |           |          | 
+    // title      | text                        |           |          | 
+    // abstract   | json                        |           |          | 
+    // cache_date | timestamp without time zone |           |          | 
+   
+
+    // export interface ArticleData {
+    //     id: string;
+    //     title: string;
+    //     articleType: ArticleType;
+    //     abstract?: AbstractSection[];
+    // }
+    
+
+    // return new Promise<ExternalArticle[]>((resolve: any) => {
+    //     let columns = ['external_articles.id', 'external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
+    //     let join = 'join types on external_articles.type = types.id';
+
+    //     let baseStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
+
+    //     let queryStr;
+    //     if (ids.length > 0) {
+    //         queryStr = pgFormat(baseStr + ' where external_articles.id in (%L)', ids);
+    //     } else {
+    //         queryStr = baseStr;
+    //     }
+
+    //     pool.query(queryStr, (error, results) => {
+    //         if (error) {
+    //             throw error
+    //         }
+
+    //         let articles: ExternalArticle[] = [];
+    //         results.rows.forEach((row: any) => {
+    //             let article: ExternalArticle = {
+    //                 publicId: row.article_id,
+    //                 type: row.type,
+    //                 cached_id: row.cached_id,
+    //                 id: row.id
+    //             };
+    //             articles.push(article);
+    //         });
+
+    //         resolve(articles);
+    //     });
+    // })
 
 
     let cachedArticles: Promise<ArticleData[]> = new Promise<ArticleData[]>((resolve: any) => {
@@ -92,16 +141,16 @@ function cacheArticles(externalArticles: ExternalArticle[], articles: ArticleDat
     });
 
     articles.forEach((article: ArticleData) => {
-        let columns = ['article_id', 'title', 'abstract', "cache_date"];
+        let columns = ['article_id', 'title', 'abstract', "article_source", "cache_date"];
         let queryStr = 'insert into cached_articles (' + columns.join(',') + ') values ($1, $2, $3, now()) returning id';
-        let values = [article.id, article.title, JSON.stringify(article.abstract)];
+        let values = [article.id, article.title, JSON.stringify(article.abstract), article.articleSource];
 
         pool.query(queryStr, values, (error, results) => {
             if (error) {
                 throw error
             }
 
-            let externalArticle = externalArticleLookupTable[idHash(article.id, article.articleType)];
+            let externalArticle = externalArticleLookupTable[idHash(article.id, article.articleSource)];
 
             let queryStr = 'update external_articles set cached_id=$1 where id=$2';
             let values = [results.rows[0].id, externalArticle.id];
@@ -146,7 +195,7 @@ function abstractsFromArticles(remoteDb: string, rawArticle: any): ArticleData[]
         let article: ArticleData = {
             id: 'UnsupportedArticleDatabase',
             title: '',
-            articleType: ''
+            articleSource: ''
         }
 
         return [article];
@@ -166,7 +215,7 @@ function abstractsFromPubmedArticles(response: any, remoteDb: ArticleType): Arti
         let article: ArticleData = {
             id: id,
             title: title,
-            articleType: remoteDb
+            articleSource: remoteDb
         };
 
         if (typeof rawArticle.MedlineCitation[0].Article[0].Abstract !== 'undefined') {
