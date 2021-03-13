@@ -32,7 +32,6 @@ function fetchArticles(ids: number[]): Promise<ArticleData[][]> {
             let articles: Promise<ArticleData[]>[] = [];
 
             articles.push(fetchArticlesFromCache(cacheHits));
-
             articles = articles.concat(remoteFetchArticles(cacheMisses));
 
             resolve(Promise.all(articles));
