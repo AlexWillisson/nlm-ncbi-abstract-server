@@ -1,0 +1,1 @@
+{"version":3,"file":"testArticles.js","sourceRoot":"","sources":["../../src/testArticles.ts"],"names":[],"mappings":";;;AAAa,QAAA,YAAY,GAAG;IAC1B;QACE,EAAE,EAAE,EAAE;QACN,KAAK,EAAE,kDAAkD;QACzD,QAAQ,EAAE,mBAAmB;KAC9B;IACD;QACE,EAAE,EAAE,IAAI;QACR,KAAK,EAAE,oDAAoD;QAC3D,QAAQ,EAAE,iMAAiM;KAC5M;CACF,CAAA"}

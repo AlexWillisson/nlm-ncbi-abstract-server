@@ -43,63 +43,42 @@ function fetchArticles(ids: number[]): Promise<ArticleData[][]> {
 }
 
 function fetchArticlesFromCache(articles: ExternalArticle[]): Promise<ArticleData[]> {
-    let columns = ['article_id', 'title', 'abstract', 'article_source'];
+    if (articles.length === 0) {
+        return new Promise<ArticleData[]>((resolve: any) => {
+            resolve([]);
+        });
+    }
 
-    // id         | integer                     |           | not null | nextval('cached_articles_id_seq'::regclass)
-    // article_id | text                        |           |          | 
-    // title      | text                        |           |          | 
-    // abstract   | json                        |           |          | 
-    // cache_date | timestamp without time zone |           |          | 
-   
+    return new Promise<ArticleData[]>((resolve: any) => {
+        let columns = ['article_id', 'title', 'abstract', 'source'];
+        let ids = articles.map((article: ExternalArticle) => article.cached_id);
 
-    // export interface ArticleData {
-    //     id: string;
-    //     title: string;
-    //     articleType: ArticleType;
-    //     abstract?: AbstractSection[];
-    // }
-    
+        let baseStr = 'select ' + columns.join(',') + ' from cached_articles where id in (%s) order by article_id';
+        let queryStr = pgFormat(baseStr, ids);
 
-    // return new Promise<ExternalArticle[]>((resolve: any) => {
-    //     let columns = ['external_articles.id', 'external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
-    //     let join = 'join types on external_articles.type = types.id';
+        pool.query(queryStr, (error, results) => {
+            if (error) {
+                throw error
+            }
 
-    //     let baseStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
+            let articles: ArticleData[] = [];
+            results.rows.forEach((row: any) => {
+                let article: ArticleData = {
+                    id: row.id,
+                    title: row.title,
+                    articleSource: row.articleSource,
+                };
 
-    //     let queryStr;
-    //     if (ids.length > 0) {
-    //         queryStr = pgFormat(baseStr + ' where external_articles.id in (%L)', ids);
-    //     } else {
-    //         queryStr = baseStr;
-    //     }
+                if (row.abstract !== null) {
+                    article.abstract = row.abstract;
+                }
 
-    //     pool.query(queryStr, (error, results) => {
-    //         if (error) {
-    //             throw error
-    //         }
+                articles.push(article);
+            });
 
-    //         let articles: ExternalArticle[] = [];
-    //         results.rows.forEach((row: any) => {
-    //             let article: ExternalArticle = {
-    //                 publicId: row.article_id,
-    //                 type: row.type,
-    //                 cached_id: row.cached_id,
-    //                 id: row.id
-    //             };
-    //             articles.push(article);
-    //         });
-
-    //         resolve(articles);
-    //     });
-    // })
-
-
-    let cachedArticles: Promise<ArticleData[]> = new Promise<ArticleData[]>((resolve: any) => {
-        let articles: ArticleData[] = [];
-        resolve(articles);
+            resolve(articles);
+        });
     });
-
-    return cachedArticles;
 }
 
 function remoteFetchArticles(ids: ExternalArticle[]): Promise<ArticleData[]>[] {
@@ -141,8 +120,8 @@ function cacheArticles(externalArticles: ExternalArticle[], articles: ArticleDat
     });
 
     articles.forEach((article: ArticleData) => {
-        let columns = ['article_id', 'title', 'abstract', "article_source", "cache_date"];
-        let queryStr = 'insert into cached_articles (' + columns.join(',') + ') values ($1, $2, $3, now()) returning id';
+        let columns = ['article_id', 'title', 'abstract', "source", "cache_date"];
+        let queryStr = 'insert into cached_articles (' + columns.join(',') + ') values ($1, $2, $3, $4, now()) returning id';
         let values = [article.id, article.title, JSON.stringify(article.abstract), article.articleSource];
 
         pool.query(queryStr, values, (error, results) => {
@@ -265,6 +244,8 @@ function externalArticleIdsFromBackend(ids: number[]): Promise<ExternalArticle[]
         } else {
             queryStr = baseStr;
         }
+
+        queryStr += ' order by external_articles.article_id';
 
         pool.query(queryStr, (error, results) => {
             if (error) {
