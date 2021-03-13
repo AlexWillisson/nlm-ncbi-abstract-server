@@ -22,7 +22,7 @@ function fetchArticles(ids: number[]): Promise<ArticleData[][]> {
             let cacheMisses: ExternalArticle[] = [];
 
             externalArticles.forEach((externalArticle: ExternalArticle) => {
-                if (externalArticle.cached_id !== null && externalArticle.cached_id !== 0) {
+                if (externalArticle.cache_id !== null && externalArticle.cache_id !== 0) {
                     cacheHits.push(externalArticle);
                 } else {
                     cacheMisses.push(externalArticle);
@@ -48,7 +48,7 @@ function fetchArticlesFromCache(articles: ExternalArticle[]): Promise<ArticleDat
 
     return new Promise<ArticleData[]>((resolve: any) => {
         let columns = ['article_id', 'title', 'abstract', 'source'];
-        let ids = articles.map((article: ExternalArticle) => article.cached_id);
+        let ids = articles.map((article: ExternalArticle) => article.cache_id);
 
         let baseStr = 'select ' + columns.join(',') + ' from cached_articles where id in (%s) order by article_id';
         let queryStr = pgFormat(baseStr, ids);
@@ -128,7 +128,7 @@ function cacheArticles(externalArticles: ExternalArticle[], articles: ArticleDat
 
             let externalArticle = externalArticleLookupTable[idHash(article.id, article.articleSource)];
 
-            let queryStr = 'update external_articles set cached_id=$1 where id=$2';
+            let queryStr = 'update external_articles set cache_id=$1 where id=$2';
             let values = [results.rows[0].id, externalArticle.id];
             pool.query(queryStr, values, (error, results) => {
                 if (error) {
@@ -150,6 +150,7 @@ function fetchArticlesPerRemoteDb(remoteDb: string, externalArticles: ExternalAr
 
     let query = new URLSearchParams(params);
     return new Promise<ArticleData[]>((resolve: any) => {
+        console.log('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?' + query.toString());
         fetch('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?' + query.toString())
             .then((res: any) => res.text())
             .then((body: string) => {
@@ -230,7 +231,7 @@ function abstractsFromPubmedArticles(response: any, remoteDb: ArticleType): Arti
 // Pass in [] for IDs to get all articles
 function externalArticleIdsFromBackend(ids: number[]): Promise<ExternalArticle[]> {
     return new Promise<ExternalArticle[]>((resolve: any) => {
-        let columns = ['external_articles.id', 'external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
+        let columns = ['external_articles.id', 'external_articles.article_id', 'types.name as type', 'external_articles.cache_id'];
         let join = 'join types on external_articles.type = types.id';
 
         let baseStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
@@ -254,7 +255,7 @@ function externalArticleIdsFromBackend(ids: number[]): Promise<ExternalArticle[]
                 let article: ExternalArticle = {
                     publicId: row.article_id,
                     type: row.type,
-                    cached_id: row.cached_id,
+                    cache_id: row.cache_id,
                     id: row.id
                 };
                 articles.push(article);

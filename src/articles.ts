@@ -3,7 +3,7 @@ export type ArticleType = 'pubmed' | 'omim' | 'hgmd' | '';
 export interface ExternalArticle {
     type: ArticleType;
     publicId: string;
-    cached_id?: number;
+    cache_id?: number;
     id: number;
 }
 

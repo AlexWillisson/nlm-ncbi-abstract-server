@@ -32,7 +32,6 @@ function fetchArticles(ids) {
             let articles = [];
             articles.push(fetchArticlesFromCache(cacheHits));
             articles = articles.concat(remoteFetchArticles(cacheMisses));
-            // articles.unshift(cachedArticles);
             resolve(Promise.all(articles));
         });
     });
@@ -125,6 +124,7 @@ function fetchArticlesPerRemoteDb(remoteDb, externalArticles) {
     };
     let query = new URLSearchParams(params);
     return new Promise((resolve) => {
+        console.log('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?' + query.toString());
         node_fetch_1.default('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?' + query.toString())
             .then((res) => res.text())
             .then((body) => {
