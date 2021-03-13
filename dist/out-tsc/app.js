@@ -183,7 +183,6 @@ function dataFromPubmedArticles(response, remoteDb) {
         else {
             articleDate = completeDate;
         }
-        console.log(title);
         let article = {
             id: id,
             title: title,
@@ -229,7 +228,6 @@ function externalArticleIdsFromBackend(ids) {
         else {
             queryStr = baseStr;
         }
-        queryStr += ' order by external_articles.article_id';
         pool.query(queryStr, (error, results) => {
             if (error) {
                 throw error;
