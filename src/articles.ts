@@ -12,6 +12,7 @@ export interface ArticleData {
     title: string;
     articleSource: ArticleType;
     abstract?: AbstractSection[];
+    date: Date;
 }
 
 export interface AbstractSection {

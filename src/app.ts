@@ -47,10 +47,10 @@ function fetchArticlesFromCache(articles: ExternalArticle[]): Promise<ArticleDat
     }
 
     return new Promise<ArticleData[]>((resolve: any) => {
-        let columns = ['article_id', 'title', 'abstract', 'source'];
+        let columns = ['article_id', 'title', 'abstract', 'source', 'revision_date'];
         let ids = articles.map((article: ExternalArticle) => article.cache_id);
 
-        let baseStr = 'select ' + columns.join(',') + ' from article_cache where id in (%s) order by article_id';
+        let baseStr = 'select ' + columns.join(',') + ' from article_cache where id in (%s)';
         let queryStr = pgFormat(baseStr, ids);
 
         pool.query(queryStr, (error, results) => {
@@ -61,9 +61,10 @@ function fetchArticlesFromCache(articles: ExternalArticle[]): Promise<ArticleDat
             let articles: ArticleData[] = [];
             results.rows.forEach((row: any) => {
                 let article: ArticleData = {
-                    id: row.id,
+                    id: row.article_id,
                     title: row.title,
                     articleSource: row.articleSource,
+                    date: row.revision_date
                 };
 
                 if (row.abstract !== null) {
@@ -117,9 +118,9 @@ function cacheArticles(externalArticles: ExternalArticle[], articles: ArticleDat
     });
 
     articles.forEach((article: ArticleData) => {
-        let columns = ['article_id', 'title', 'abstract', "source", "cache_date"];
-        let queryStr = 'insert into article_cache (' + columns.join(',') + ') values ($1, $2, $3, $4, now()) returning id';
-        let values = [article.id, article.title, JSON.stringify(article.abstract), article.articleSource];
+        let columns = ['article_id', 'title', 'abstract', 'source', 'revision_date', 'cache_date'];
+        let queryStr = 'insert into article_cache (' + columns.join(',') + ') values ($1, $2, $3, $4, $5, now()) returning id';
+        let values = [article.id, article.title, JSON.stringify(article.abstract), article.articleSource, article.date];
 
         pool.query(queryStr, values, (error, results) => {
             if (error) {
@@ -150,7 +151,6 @@ function fetchArticlesPerRemoteDb(remoteDb: string, externalArticles: ExternalAr
 
     let query = new URLSearchParams(params);
     return new Promise<ArticleData[]>((resolve: any) => {
-        console.log('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?' + query.toString());
         fetch('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?' + query.toString())
             .then((res: any) => res.text())
             .then((body: string) => {
@@ -172,10 +172,27 @@ function dataFromExternalArticleSource(remoteDb: string, rawArticle: any): Artic
         let article: ArticleData = {
             id: 'UnsupportedArticleDatabase',
             title: '',
-            articleSource: ''
+            articleSource: '',
+            date: new Date(0)
         }
 
         return [article];
+    }
+}
+
+function parseEutilsDate(eutilsDate: any): Date {
+    if (eutilsDate === undefined) {
+        return new Date(0);
+    }
+
+    try {
+        let year = parseInt(eutilsDate[0].Year);
+        let month = parseInt(eutilsDate[0].Month);
+        let day = parseInt(eutilsDate[0].Day);
+
+        return new Date(year, month - 1, day);
+    } catch {
+        return new Date(0);
     }
 }
 
@@ -187,12 +204,23 @@ function dataFromPubmedArticles(response: any, remoteDb: ArticleType): ArticleDa
         let id: string, title: string, abstractSections: AbstractSection[];
         let rawAbstractSections: any[];
         id = rawArticle.MedlineCitation[0].PMID[0]['_'];
-        title = rawArticle.MedlineCitation[0].Article[0].ArticleTitle;
+        title = rawArticle.MedlineCitation[0].Article[0].ArticleTitle[0];
+
+        let articleDate;
+        let completeDate = parseEutilsDate(rawArticle.MedlineCitation[0].DateCompleted);
+        let revisedDate = parseEutilsDate(rawArticle.MedlineCitation[0].DateRevised);
+
+        if (revisedDate > completeDate) {
+            articleDate = revisedDate;
+        } else {
+            articleDate = completeDate;
+        }
 
         let article: ArticleData = {
             id: id,
             title: title,
-            articleSource: remoteDb
+            articleSource: remoteDb,
+            date: articleDate
         };
 
         if (typeof rawArticle.MedlineCitation[0].Article[0].Abstract !== 'undefined') {
@@ -242,8 +270,6 @@ function externalArticleIdsFromBackend(ids: number[]): Promise<ExternalArticle[]
         } else {
             queryStr = baseStr;
         }
-
-        queryStr += ' order by external_articles.article_id';
 
         pool.query(queryStr, (error, results) => {
             if (error) {
