@@ -2,9 +2,9 @@ export type ArticleType = 'pubmed' | 'omim' | 'hgmd' | '';
 
 export interface ExternalArticle {
     type: ArticleType;
-    id: string;
+    publicId: string;
     cached_id?: number;
-    externalArticleId: number;
+    id: number;
 }
 
 export interface ArticleData {

@@ -17,25 +17,39 @@ const pool = new pg_1.Pool({
 });
 // TODO: generates uncached entries for cache misses
 function fetchArticles(ids) {
-    let cacheHits = [];
-    let cacheMisses = [];
-    ids.forEach((externalArticle) => {
-        if (externalArticle.cached_id !== null && externalArticle.cached_id !== 0) {
-            cacheHits.push(externalArticle);
-        }
-        else {
-            cacheMisses.push(externalArticle);
-        }
+    return new Promise((resolve) => {
+        externalArticleIdsFromDb(ids).then((externalArticles) => {
+            let cacheHits = [];
+            let cacheMisses = [];
+            externalArticles.forEach((externalArticle) => {
+                if (externalArticle.cached_id !== null && externalArticle.cached_id !== 0) {
+                    cacheHits.push(externalArticle);
+                }
+                else {
+                    cacheMisses.push(externalArticle);
+                }
+            });
+            // TODO fetch cache hits
+            let cachedArticles = new Promise((resolve) => {
+                let articles = [];
+                resolve(articles);
+            });
+            let articles = remoteFetchArticles(cacheMisses);
+            articles.unshift(cachedArticles);
+            resolve(Promise.all(articles));
+        });
     });
-    // TODO: fetch cache hits
-    let cachedArticles = new Promise((resolve) => {
-        let articles = [];
-        resolve(articles);
-    });
-    let articles = remoteFetchArticles(cacheMisses);
-    articles.unshift(cachedArticles);
-    return Promise.all(articles);
 }
+//     // in allSettled, remoteFetchArticles will come next, then we'll collect the cache hits from the database
+//     // TODO: fetch cache hits
+//     let cachedArticles: Promise<ArticleData[]> = new Promise<ArticleData[]>((resolve: any) => {
+//         let articles: ArticleData[] = [];
+//         resolve(articles);
+//     });
+//     let articles = remoteFetchArticles(cacheMisses);
+//     articles.unshift(cachedArticles);
+//     return Promise.all(articles);
+// }
 function remoteFetchArticles(ids) {
     let splitByType = {};
     let types = [];
@@ -59,15 +73,13 @@ function cacheArticles(externalArticles, articles) {
         return type + ':' + id;
     }
     externalArticles.forEach((externalArticle) => {
-        let hashedId = idHash(externalArticle.id, externalArticle.type);
+        let hashedId = idHash(externalArticle.publicId, externalArticle.type);
         if (hashedId in externalArticleLookupTable) {
             throw new Error('somehow an article got in the DB twice');
         }
         externalArticleLookupTable[hashedId] = externalArticle;
     });
     articles.forEach((article) => {
-        // create table cached_articles (id serial primary key, article_id text, title text, abstract json, cache_date timestamp);
-        // insert into cached_articles (article_id, title, abstract, cache_date) values ($1, $2, $3, now()) returning id;
         let columns = ['article_id', 'title', 'abstract', "cache_date"];
         let queryStr = 'insert into cached_articles (' + columns.join(',') + ') values ($1, $2, $3, now()) returning id';
         let values = [article.id, article.title, JSON.stringify(article.abstract)];
@@ -77,20 +89,17 @@ function cacheArticles(externalArticles, articles) {
             }
             let externalArticle = externalArticleLookupTable[idHash(article.id, article.articleType)];
             let queryStr = 'update external_articles set cached_id=$1 where id=$2';
-            let values = [results.rows[0].id, externalArticle.externalArticleId];
-            console.log(queryStr);
-            console.log(values);
+            let values = [results.rows[0].id, externalArticle.id];
             pool.query(queryStr, values, (error, results) => {
                 if (error) {
                     throw error;
                 }
-                // console.log(results);
             });
         });
     });
 }
 function fetchArticlesPerDb(db, externalArticles) {
-    let ids = externalArticles.map((article) => article.id);
+    let ids = externalArticles.map((article) => article.publicId);
     let params = {
         db: db,
         format: 'xml',
@@ -168,22 +177,18 @@ function externalArticleByIdFromDb(id) {
         let columns = ['external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
         let join = 'join types on external_articles.type = types.id';
         let baseStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
-        let queryStr = pgFormat(baseStr + ' where external_articles.id = %L', id);
+        let queryStr = pgFormat(baseStr + ' where external_articles.id = %L limit 1', id);
         pool.query(queryStr, (error, results) => {
             if (error) {
                 throw error;
             }
-            let articles = [];
-            results.rows.forEach((row) => {
-                let article = {
-                    id: row.article_id,
-                    type: row.type,
-                    cached_id: row.cached_id,
-                    externalArticleId: row.id
-                };
-                articles.push(article);
-            });
-            resolve(articles);
+            let article = {
+                publicId: results.rows[0].article_id,
+                type: results.rows[0].type,
+                cached_id: results.rows[0].cached_id,
+                id: results.rows[0].id
+            };
+            resolve(article);
         });
     });
 }
@@ -195,7 +200,7 @@ function externalArticleIdsFromDb(ids) {
         let baseStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
         let queryStr;
         if (ids.length > 0) {
-            queryStr = pgFormat(baseStr + ' where external_articles.article_id in (%L)', ids);
+            queryStr = pgFormat(baseStr + ' where external_articles.id in (%L)', ids);
         }
         else {
             queryStr = baseStr;
@@ -207,10 +212,10 @@ function externalArticleIdsFromDb(ids) {
             let articles = [];
             results.rows.forEach((row) => {
                 let article = {
-                    id: row.article_id,
+                    publicId: row.article_id,
                     type: row.type,
                     cached_id: row.cached_id,
-                    externalArticleId: row.id
+                    id: row.id
                 };
                 articles.push(article);
             });
@@ -218,16 +223,16 @@ function externalArticleIdsFromDb(ids) {
         });
     });
 }
-var externalArticles = [];
+var allArticleIds = [];
 externalArticleIdsFromDb([]).then((resolve) => {
-    externalArticles = resolve;
+    allArticleIds = resolve.map((article) => article.id);
 });
 const app = express_1.default();
 const port = 3000;
 app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    fetchArticles(externalArticles)
+    fetchArticles(allArticleIds)
         .then((values) => {
         let articles = values.flat(1);
         if (articles.length > 0) {

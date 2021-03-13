@@ -15,37 +15,47 @@ const pool = new Pool({
 })
 
 // TODO: generates uncached entries for cache misses
-function fetchArticles(ids: ExternalArticle[]): Promise<ArticleData[][]> {
-    let cacheHits: ExternalArticle[] = [];
-    let cacheMisses: ExternalArticle[] = [];
+function fetchArticles(ids: number[]): Promise<ArticleData[][]> {
+    return new Promise<ArticleData[][]>((resolve: any) => {
+        externalArticleIdsFromDb(ids).then((externalArticles: ExternalArticle[]) => {
+            let cacheHits: ExternalArticle[] = [];
+            let cacheMisses: ExternalArticle[] = [];
 
-    let cacheChecks: Promise<ExternalArticle>[] = [];
-    ids.forEach((externalArticle: ExternalArticle) => {
-        if (externalArticle.cached_id !== null && externalArticle.cached_id !== 0) {
-            cacheHits.push(externalArticle);
-        } else {
-            cacheChecks.push(externalArticleByIdFromDb(externalArticle.externalArticleId));
-        }
-    });
+            externalArticles.forEach((externalArticle: ExternalArticle) => {
+                if (externalArticle.cached_id !== null && externalArticle.cached_id !== 0) {
+                    cacheHits.push(externalArticle);
+                } else {
+                    cacheMisses.push(externalArticle);
+                }
+            });
 
-    Promise.allSettled(cacheChecks)
-        .then((externalArticlePromises: PromiseSettledResult<ExternalArticle>[]) => {
-            // this should have a list of settled promises I can re-combine to cacheMisses
+            // TODO fetch cache hits
+            let cachedArticles: Promise<ArticleData[]> = new Promise<ArticleData[]>((resolve: any) => {
+                let articles: ArticleData[] = [];
+                resolve(articles);
+            });
+
+            let articles = remoteFetchArticles(cacheMisses);
+            articles.unshift(cachedArticles);
+
+            resolve(Promise.all(articles));
         });
-
-    // in allSettled, remoteFetchArticles will come next, then we'll collect the cache hits from the database
-
-    // TODO: fetch cache hits
-    let cachedArticles: Promise<ArticleData[]> = new Promise<ArticleData[]>((resolve: any) => {
-        let articles: ArticleData[] = [];
-        resolve(articles);
     });
-
-    let articles = remoteFetchArticles(cacheMisses);
-    articles.unshift(cachedArticles);
-
-    return Promise.all(articles);
 }
+
+//     // in allSettled, remoteFetchArticles will come next, then we'll collect the cache hits from the database
+
+//     // TODO: fetch cache hits
+//     let cachedArticles: Promise<ArticleData[]> = new Promise<ArticleData[]>((resolve: any) => {
+//         let articles: ArticleData[] = [];
+//         resolve(articles);
+//     });
+
+//     let articles = remoteFetchArticles(cacheMisses);
+//     articles.unshift(cachedArticles);
+
+//     return Promise.all(articles);
+// }
 
 function remoteFetchArticles(ids: ExternalArticle[]): Promise<ArticleData[]>[] {
     let splitByType: { [type: string]: ExternalArticle[] } = {};
@@ -77,7 +87,7 @@ function cacheArticles(externalArticles: ExternalArticle[], articles: ArticleDat
     }
 
     externalArticles.forEach((externalArticle: ExternalArticle) => {
-        let hashedId = idHash(externalArticle.id, externalArticle.type);
+        let hashedId = idHash(externalArticle.publicId, externalArticle.type);
         if (hashedId in externalArticleLookupTable) {
             throw new Error('somehow an article got in the DB twice');
         }
@@ -98,7 +108,7 @@ function cacheArticles(externalArticles: ExternalArticle[], articles: ArticleDat
             let externalArticle = externalArticleLookupTable[idHash(article.id, article.articleType)];
 
             let queryStr = 'update external_articles set cached_id=$1 where id=$2';
-            let values = [results.rows[0].id, externalArticle.externalArticleId];
+            let values = [results.rows[0].id, externalArticle.id];
             pool.query(queryStr, values, (error, results) => {
                 if (error) {
                     throw error
@@ -109,7 +119,7 @@ function cacheArticles(externalArticles: ExternalArticle[], articles: ArticleDat
 }
 
 function fetchArticlesPerDb(db: string, externalArticles: ExternalArticle[]): Promise<ArticleData[]> {
-    let ids = externalArticles.map((article: ExternalArticle) => article.id);
+    let ids = externalArticles.map((article: ExternalArticle) => article.publicId);
 
     let params = {
         db: db,
@@ -197,7 +207,7 @@ function abstractsFromPubmedArticles(response: any, db: ArticleType): ArticleDat
 }
 
 function externalArticleByIdFromDb(id: number): Promise<ExternalArticle> {
-    return new Promise((resolve: any) => {
+    return new Promise<ExternalArticle>((resolve: any) => {
         let columns = ['external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
         let join = 'join types on external_articles.type = types.id';
 
@@ -210,10 +220,10 @@ function externalArticleByIdFromDb(id: number): Promise<ExternalArticle> {
             }
 
             let article: ExternalArticle = {
-                id: results.rows[0].article_id,
+                publicId: results.rows[0].article_id,
                 type: results.rows[0].type,
                 cached_id: results.rows[0].cached_id,
-                externalArticleId: results.rows[0].id
+                id: results.rows[0].id
             };
 
             resolve(article);
@@ -222,8 +232,8 @@ function externalArticleByIdFromDb(id: number): Promise<ExternalArticle> {
 }
 
 // Pass in [] for IDs to get all articles
-function externalArticleIdsFromDb(ids: string[]): Promise<ExternalArticle[]> {
-    return new Promise((resolve: any) => {
+function externalArticleIdsFromDb(ids: number[]): Promise<ExternalArticle[]> {
+    return new Promise<ExternalArticle[]>((resolve: any) => {
         let columns = ['external_articles.id', 'external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
         let join = 'join types on external_articles.type = types.id';
 
@@ -231,7 +241,7 @@ function externalArticleIdsFromDb(ids: string[]): Promise<ExternalArticle[]> {
 
         let queryStr;
         if (ids.length > 0) {
-            queryStr = pgFormat(baseStr + ' where external_articles.article_id in (%L)', ids);
+            queryStr = pgFormat(baseStr + ' where external_articles.id in (%L)', ids);
         } else {
             queryStr = baseStr;
         }
@@ -244,10 +254,10 @@ function externalArticleIdsFromDb(ids: string[]): Promise<ExternalArticle[]> {
             let articles: ExternalArticle[] = [];
             results.rows.forEach((row: any) => {
                 let article: ExternalArticle = {
-                    id: row.article_id,
+                    publicId: row.article_id,
                     type: row.type,
                     cached_id: row.cached_id,
-                    externalArticleId: row.id
+                    id: row.id
                 };
                 articles.push(article);
             });
@@ -257,9 +267,9 @@ function externalArticleIdsFromDb(ids: string[]): Promise<ExternalArticle[]> {
     })
 }
 
-var externalArticles: ExternalArticle[] = [];
-externalArticleIdsFromDb([]).then((resolve: any) => {
-    externalArticles = resolve;
+var allArticleIds: number[] = [];
+externalArticleIdsFromDb([]).then((resolve: ExternalArticle[]) => {
+    allArticleIds = resolve.map((article: ExternalArticle) => article.id);
 });
 
 const app = express();
@@ -268,7 +278,7 @@ app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
 
-    fetchArticles(externalArticles)
+    fetchArticles(allArticleIds)
         .then((values: ArticleData[][]) => {
             let articles: ArticleData[] = values.flat(1);
             if (articles.length > 0) {
