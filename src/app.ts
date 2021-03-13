@@ -17,7 +17,7 @@ const pool = new Pool({
 // TODO: generates uncached entries for cache misses
 function fetchArticles(ids: number[]): Promise<ArticleData[][]> {
     return new Promise<ArticleData[][]>((resolve: any) => {
-        externalArticleIdsFromDb(ids).then((externalArticles: ExternalArticle[]) => {
+        externalArticleIdsFromBackend(ids).then((externalArticles: ExternalArticle[]) => {
             let cacheHits: ExternalArticle[] = [];
             let cacheMisses: ExternalArticle[] = [];
 
@@ -29,18 +29,28 @@ function fetchArticles(ids: number[]): Promise<ArticleData[][]> {
                 }
             });
 
-            // TODO fetch cache hits
-            let cachedArticles: Promise<ArticleData[]> = new Promise<ArticleData[]>((resolve: any) => {
-                let articles: ArticleData[] = [];
-                resolve(articles);
-            });
+            let articles: Promise<ArticleData[]>[] = [];
 
-            let articles = remoteFetchArticles(cacheMisses);
-            articles.unshift(cachedArticles);
+            articles.push(fetchArticlesFromCache(cacheHits));
+
+
+            articles = articles.concat(remoteFetchArticles(cacheMisses));
+            // articles.unshift(cachedArticles);
 
             resolve(Promise.all(articles));
         });
     });
+}
+
+function fetchArticlesFromCache(articles: ExternalArticle[]): Promise<ArticleData[]> {
+
+
+    let cachedArticles: Promise<ArticleData[]> = new Promise<ArticleData[]>((resolve: any) => {
+        let articles: ArticleData[] = [];
+        resolve(articles);
+    });
+
+    return cachedArticles;
 }
 
 function remoteFetchArticles(ids: ExternalArticle[]): Promise<ArticleData[]>[] {
@@ -58,7 +68,7 @@ function remoteFetchArticles(ids: ExternalArticle[]): Promise<ArticleData[]>[] {
 
     let articlePromises: Promise<ArticleData[]>[] = [];
     types.forEach((type: string) => {
-        let articles = fetchArticlesPerDb(type, splitByType[type]);
+        let articles = fetchArticlesPerRemoteDb(type, splitByType[type]);
         articlePromises.push(articles);
     });
 
@@ -104,11 +114,11 @@ function cacheArticles(externalArticles: ExternalArticle[], articles: ArticleDat
     });
 }
 
-function fetchArticlesPerDb(db: string, externalArticles: ExternalArticle[]): Promise<ArticleData[]> {
+function fetchArticlesPerRemoteDb(remoteDb: string, externalArticles: ExternalArticle[]): Promise<ArticleData[]> {
     let ids = externalArticles.map((article: ExternalArticle) => article.publicId);
 
     let params = {
-        db: db,
+        db: remoteDb,
         format: 'xml',
         id: ids.join(',')
     }
@@ -121,7 +131,7 @@ function fetchArticlesPerDb(db: string, externalArticles: ExternalArticle[]): Pr
                 let parser = new xmlParser();
                 parser.parseStringPromise(body)
                     .then((res: any) => {
-                        let articleData: ArticleData[] = abstractsFromArticles(db, res);
+                        let articleData: ArticleData[] = abstractsFromArticles(remoteDb, res);
                         cacheArticles(externalArticles, articleData);
                         resolve(articleData);
                     });
@@ -129,8 +139,8 @@ function fetchArticlesPerDb(db: string, externalArticles: ExternalArticle[]): Pr
     });
 }
 
-function abstractsFromArticles(db: string, rawArticle: any): ArticleData[] {
-    if (db === 'pubmed') {
+function abstractsFromArticles(remoteDb: string, rawArticle: any): ArticleData[] {
+    if (remoteDb === 'pubmed') {
         return abstractsFromPubmedArticles(rawArticle, 'pubmed');
     } else {
         let article: ArticleData = {
@@ -143,7 +153,7 @@ function abstractsFromArticles(db: string, rawArticle: any): ArticleData[] {
     }
 }
 
-function abstractsFromPubmedArticles(response: any, db: ArticleType): ArticleData[] {
+function abstractsFromPubmedArticles(response: any, remoteDb: ArticleType): ArticleData[] {
     let rawArticles: any[] = response.PubmedArticleSet.PubmedArticle;
     let articles: ArticleData[] = [];
 
@@ -156,7 +166,7 @@ function abstractsFromPubmedArticles(response: any, db: ArticleType): ArticleDat
         let article: ArticleData = {
             id: id,
             title: title,
-            articleType: db
+            articleType: remoteDb
         };
 
         if (typeof rawArticle.MedlineCitation[0].Article[0].Abstract !== 'undefined') {
@@ -192,33 +202,8 @@ function abstractsFromPubmedArticles(response: any, db: ArticleType): ArticleDat
     return articles;
 }
 
-function externalArticleByIdFromDb(id: number): Promise<ExternalArticle> {
-    return new Promise<ExternalArticle>((resolve: any) => {
-        let columns = ['external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
-        let join = 'join types on external_articles.type = types.id';
-
-        let baseStr = 'select ' + columns.join(',') + ' from external_articles ' + join;
-        let queryStr = pgFormat(baseStr + ' where external_articles.id = %L limit 1', id);
-
-        pool.query(queryStr, (error, results) => {
-            if (error) {
-                throw error
-            }
-
-            let article: ExternalArticle = {
-                publicId: results.rows[0].article_id,
-                type: results.rows[0].type,
-                cached_id: results.rows[0].cached_id,
-                id: results.rows[0].id
-            };
-
-            resolve(article);
-        });
-    })
-}
-
 // Pass in [] for IDs to get all articles
-function externalArticleIdsFromDb(ids: number[]): Promise<ExternalArticle[]> {
+function externalArticleIdsFromBackend(ids: number[]): Promise<ExternalArticle[]> {
     return new Promise<ExternalArticle[]>((resolve: any) => {
         let columns = ['external_articles.id', 'external_articles.article_id', 'types.name as type', 'external_articles.cached_id'];
         let join = 'join types on external_articles.type = types.id';
@@ -254,7 +239,7 @@ function externalArticleIdsFromDb(ids: number[]): Promise<ExternalArticle[]> {
 }
 
 var allArticleIds: number[] = [];
-externalArticleIdsFromDb([]).then((resolve: ExternalArticle[]) => {
+externalArticleIdsFromBackend([]).then((resolve: ExternalArticle[]) => {
     allArticleIds = resolve.map((article: ExternalArticle) => article.id);
 });
 

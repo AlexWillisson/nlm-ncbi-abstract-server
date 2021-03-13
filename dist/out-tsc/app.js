@@ -29,27 +29,22 @@ function fetchArticles(ids) {
                     cacheMisses.push(externalArticle);
                 }
             });
-            // TODO fetch cache hits
-            let cachedArticles = new Promise((resolve) => {
-                let articles = [];
-                resolve(articles);
-            });
-            let articles = remoteFetchArticles(cacheMisses);
-            articles.unshift(cachedArticles);
+            let articles = [];
+            articles.push(fetchArticlesFromCache(cacheHits));
+            articles = articles.concat(remoteFetchArticles(cacheMisses));
+            // articles.unshift(cachedArticles);
             resolve(Promise.all(articles));
         });
     });
 }
-//     // in allSettled, remoteFetchArticles will come next, then we'll collect the cache hits from the database
-//     // TODO: fetch cache hits
-//     let cachedArticles: Promise<ArticleData[]> = new Promise<ArticleData[]>((resolve: any) => {
-//         let articles: ArticleData[] = [];
-//         resolve(articles);
-//     });
-//     let articles = remoteFetchArticles(cacheMisses);
-//     articles.unshift(cachedArticles);
-//     return Promise.all(articles);
-// }
+function fetchArticlesFromCache(articles) {
+    console.log(articles);
+    let cachedArticles = new Promise((resolve) => {
+        let articles = [];
+        resolve(articles);
+    });
+    return cachedArticles;
+}
 function remoteFetchArticles(ids) {
     let splitByType = {};
     let types = [];
