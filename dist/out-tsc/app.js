@@ -36,6 +36,3 @@ https_1.default.createServer({
     .listen(3000, function () {
     console.info(`Ready on port ${port}`);
 });
-// app.listen(port, () => {
-//     console.info(`Ready on port ${port}`);
-// });
