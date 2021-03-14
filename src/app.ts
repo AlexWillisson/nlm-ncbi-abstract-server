@@ -1,7 +1,7 @@
 import express from 'express';
 import pgFormat = require('pg-format');
 
-import { ExternalArticle, ArticleData, AbstractSection, ArticleType } from './articles';
+import { ExternalArticle, ArticleData } from './articles';
 
 import { fetchArticles, externalArticleIdsFromBackend } from './core/databaseInterface';
 

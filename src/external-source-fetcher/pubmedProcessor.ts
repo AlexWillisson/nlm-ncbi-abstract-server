@@ -1,6 +1,4 @@
-import pgFormat = require('pg-format');
-
-import { ExternalArticle, ArticleData, AbstractSection, ArticleType } from '../articles';
+import { ArticleData, AbstractSection, ArticleType } from '../articles';
 
 export function dataFromPubmedArticles(response: any, remoteDb: ArticleType): ArticleData[] {
     let rawArticles: any[] = response.PubmedArticleSet.PubmedArticle;

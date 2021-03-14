@@ -1,8 +1,7 @@
 import fetch from 'node-fetch';
-import pgFormat = require('pg-format');
 import { Parser as xmlParser } from 'xml2js';
 
-import { ExternalArticle, ArticleData, AbstractSection, ArticleType } from '../articles';
+import { ExternalArticle, ArticleData } from '../articles';
 
 import { dataFromPubmedArticles } from './pubmedProcessor';
 import { cacheArticles } from '../article-cache/cache';
