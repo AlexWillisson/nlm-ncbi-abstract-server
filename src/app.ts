@@ -1,8 +1,8 @@
 import express from 'express';
-import pgFormat = require('pg-format');
+import https from 'https';
+import fs from 'fs';
 
 import { ExternalArticle, ArticleData } from './articles';
-
 import { fetchArticles, externalArticleIdsFromBackend } from './core/databaseInterface';
 
 // This is just a fancy way to get the IDs for all the articles in the database
@@ -27,6 +27,12 @@ app.get('/', (req, res) => {
             }
         });
 });
-app.listen(port, () => {
-    console.info(`Ready on port ${port}`);
-});
+
+https.createServer({
+    key: fs.readFileSync('/home/ec2-user/certs/abstracts.willisson.org/privkey.pem'),
+    cert: fs.readFileSync('/home/ec2-user/certs/abstracts.willisson.org/cert.pem'),
+    ca: fs.readFileSync('/home/ec2-user/certs/abstracts.willisson.org/chain.pem')
+}, app)
+.listen(3000, function() {
+        console.info(`Ready on port ${port}`);
+})
