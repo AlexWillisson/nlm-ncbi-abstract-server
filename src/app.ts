@@ -14,7 +14,6 @@ const pool = new Pool({
     port: 5432,
 })
 
-// TODO: generates uncached entries for cache misses
 function fetchArticles(ids: number[]): Promise<ArticleData[][]> {
     return new Promise<ArticleData[][]>((resolve: any) => {
         externalArticleIdsFromBackend(ids).then((externalArticles: ExternalArticle[]) => {
@@ -29,37 +28,51 @@ function fetchArticles(ids: number[]): Promise<ArticleData[][]> {
                 }
             });
 
-            let articles: Promise<ArticleData[]>[] = [];
+            resolve(fetchArticlesFromCache(cacheHits)
+                .then((resolve: [ArticleData[], ExternalArticle[]]) => {
+                    let articles: Promise<ArticleData[]>[] = [];
 
-            articles.push(fetchArticlesFromCache(cacheHits));
-            articles = articles.concat(remoteFetchArticles(cacheMisses));
+                    if (resolve[0].length > 0) {
+                        let cachedArticles = resolve[0];
+                        let cacheHitsPromise = new Promise<ArticleData[]>((resolve: any) => {
+                            resolve(cachedArticles);
+                        });
+                        articles = articles.concat([cacheHitsPromise]);
+                    }
 
-            resolve(Promise.all(articles));
+                    cacheMisses = cacheMisses.concat(resolve[1]);
+                    articles = articles.concat(remoteFetchArticles(cacheMisses));
+
+                    return Promise.all(articles);
+                }));
         });
     });
 }
 
-function fetchArticlesFromCache(articles: ExternalArticle[]): Promise<ArticleData[]> {
+function fetchArticlesFromCache(articles: ExternalArticle[]): Promise<[ArticleData[], ExternalArticle[]]> {
     if (articles.length === 0) {
-        return new Promise<ArticleData[]>((resolve: any) => {
-            resolve([]);
+        return new Promise<[ArticleData[], ExternalArticle[]]>((resolve: any) => {
+            resolve([[], []]);
         });
     }
 
-    return new Promise<ArticleData[]>((resolve: any) => {
-        let columns = ['article_id', 'title', 'abstract', 'source', 'revision_date'];
-        let ids = articles.map((article: ExternalArticle) => article.cache_id);
+    return new Promise<[ArticleData[], ExternalArticle[]]>((resolve: any) => {
+        let columns = ['id', 'article_id', 'title', 'abstract', 'source', 'revision_date'];
+        let externalIds = new Set(articles.map((article: ExternalArticle) => article.cache_id));
 
         let baseStr = 'select ' + columns.join(',') + ' from article_cache where id in (%s)';
-        let queryStr = pgFormat(baseStr, ids);
+        let queryStr = pgFormat(baseStr, Array.from(externalIds));
 
         pool.query(queryStr, (error, results) => {
             if (error) {
-                throw error
+                resolve([[], articles]);
             }
 
-            let articles: ArticleData[] = [];
+            let foundIds = new Set();
+            let cachedArticles: ArticleData[] = [];
             results.rows.forEach((row: any) => {
+                foundIds.add(row.id);
+
                 let article: ArticleData = {
                     id: row.article_id,
                     title: row.title,
@@ -71,10 +84,13 @@ function fetchArticlesFromCache(articles: ExternalArticle[]): Promise<ArticleDat
                     article.abstract = row.abstract;
                 }
 
-                articles.push(article);
+                cachedArticles.push(article);
             });
+            let cacheCorruptionsIds = new Set([...externalIds].filter(x => !foundIds.has(x)));
 
-            resolve(articles);
+            let cacheCorruptions: ExternalArticle[] = articles.filter(x => cacheCorruptionsIds.has(x.cache_id));
+
+            resolve([cachedArticles, cacheCorruptions]);
         });
     });
 }

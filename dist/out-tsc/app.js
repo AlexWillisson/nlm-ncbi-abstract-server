@@ -15,7 +15,6 @@ const pool = new pg_1.Pool({
     password: 'tt#rXJn8&K#Q',
     port: 5432,
 });
-// TODO: generates uncached entries for cache misses
 function fetchArticles(ids) {
     return new Promise((resolve) => {
         externalArticleIdsFromBackend(ids).then((externalArticles) => {
@@ -29,30 +28,42 @@ function fetchArticles(ids) {
                     cacheMisses.push(externalArticle);
                 }
             });
-            let articles = [];
-            articles.push(fetchArticlesFromCache(cacheHits));
-            articles = articles.concat(remoteFetchArticles(cacheMisses));
-            resolve(Promise.all(articles));
+            resolve(fetchArticlesFromCache(cacheHits)
+                .then((resolve) => {
+                let articles = [];
+                if (resolve[0].length > 0) {
+                    let cachedArticles = resolve[0];
+                    let cacheHitsPromise = new Promise((resolve) => {
+                        resolve(cachedArticles);
+                    });
+                    articles = articles.concat([cacheHitsPromise]);
+                }
+                cacheMisses = cacheMisses.concat(resolve[1]);
+                articles = articles.concat(remoteFetchArticles(cacheMisses));
+                return Promise.all(articles);
+            }));
         });
     });
 }
 function fetchArticlesFromCache(articles) {
     if (articles.length === 0) {
         return new Promise((resolve) => {
-            resolve([]);
+            resolve([[], []]);
         });
     }
     return new Promise((resolve) => {
-        let columns = ['article_id', 'title', 'abstract', 'source', 'revision_date'];
-        let ids = articles.map((article) => article.cache_id);
+        let columns = ['id', 'article_id', 'title', 'abstract', 'source', 'revision_date'];
+        let externalIds = new Set(articles.map((article) => article.cache_id));
         let baseStr = 'select ' + columns.join(',') + ' from article_cache where id in (%s)';
-        let queryStr = pgFormat(baseStr, ids);
+        let queryStr = pgFormat(baseStr, Array.from(externalIds));
         pool.query(queryStr, (error, results) => {
             if (error) {
-                throw error;
+                resolve([[], articles]);
             }
-            let articles = [];
+            let foundIds = new Set();
+            let cachedArticles = [];
             results.rows.forEach((row) => {
+                foundIds.add(row.id);
                 let article = {
                     id: row.article_id,
                     title: row.title,
@@ -62,9 +73,11 @@ function fetchArticlesFromCache(articles) {
                 if (row.abstract !== null) {
                     article.abstract = row.abstract;
                 }
-                articles.push(article);
+                cachedArticles.push(article);
             });
-            resolve(articles);
+            let cacheCorruptionsIds = new Set([...externalIds].filter(x => !foundIds.has(x)));
+            let cacheCorruptions = articles.filter(x => cacheCorruptionsIds.has(x.cache_id));
+            resolve([cachedArticles, cacheCorruptions]);
         });
     });
 }
