@@ -5,7 +5,7 @@
   "main": "src/app.ts",
   "scripts": {
     "start": "tsc && node dist/out-tsc/app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jasmine"
   },
   "repository": {
     "type": "git",
@@ -38,6 +38,7 @@
     "@types/debug": "^4.1.5",
     "@types/express": "^4.17.11",
     "jasmine": "^3.6.4",
+    "jasmine-console-reporter": "^3.1.0",
     "tslint": "^5.20.1",
     "typescript": "^3.9.9"
   }
